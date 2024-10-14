@@ -1,0 +1,20 @@
+{
+    "name": "com.moonlitstudios.coordinator",
+    "version": "1.0.0",
+    "displayName": "Coordinator",
+    "description": "Coordinator: A dead easy way to coordinate multiple instances of Unity.",
+    "unity": "2018.1",
+    "unityRelease": "0b5",
+    "keywords": [
+        "package",
+        "unity",
+        "editor",
+        "coordinate",
+        "easy"
+    ],
+    "author": {
+        "name": "Kamau Vassall",
+        "url": "https://moonlitstudios.us/"
+    },
+    "type": "library"
+}
