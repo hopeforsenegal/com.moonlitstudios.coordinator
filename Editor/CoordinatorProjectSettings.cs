@@ -16,11 +16,10 @@ namespace MoonlitSystem
 
             if (instance == null) {
                 Directory.CreateDirectory(CoordinatorSettingsResDir);
-                var assetPath = Path.Combine(CoordinatorSettingsResDir, CoordinatorSettingsFile + CoordinatorSettingsFileExtension);
                 instance = CreateInstance<CoordinatorProjectSettings>();
                 instance.unused = "Here temporarily until real settings get added.";
 #if UNITY_EDITOR
-                AssetDatabase.CreateAsset(instance, assetPath);
+                AssetDatabase.CreateAsset(instance, Path.Combine(CoordinatorSettingsResDir, $"{CoordinatorSettingsFile}{CoordinatorSettingsFileExtension}"));
                 AssetDatabase.SaveAssets();
 #endif
             }
@@ -29,5 +28,8 @@ namespace MoonlitSystem
         }
 
         public string unused; // @placeholder. Here temporarily until real settings get added.
+
+        // Preprocessor Defines, Command line Params, & On Play Param, should not differ from person to person (just whether or not they are used for that run/session is)
+        // So it makes alot of sense that they will be stored and perhaps editable here!
     }
 }

@@ -4,59 +4,91 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-public static class Editors
+public static class CommandLineParams
+{
+    public static string Additional { get; } = "--additional";
+
+    public static string AdditionalEditorParams { get; } = string.Join(" ", Additional);
+}
+public static class Paths
 {
     public static string ProjectPath { get; } = Application.dataPath.Replace("/Assets", "");
-    public struct Editor
-    {
-        public string name;
-        public string projectPath;
-        public string assetPath;
-        public string projectSettingsPath;
+}
+public enum EditorType { Symlink, HardCopy }
+public static class EditorUserSettings
+{
+    public static EditorType Coordinator_EditorTypeOnCreate { get => (EditorType)EditorPrefs.GetInt(nameof(Coordinator_EditorTypeOnCreate), (int)EditorType.Symlink); set => EditorPrefs.SetInt(nameof(Coordinator_EditorTypeOnCreate), (int)value); }
+    public static bool Coordinator_EditorCoordinatePlay { get => EditorPrefs.GetInt(nameof(Coordinator_EditorCoordinatePlay), 0) == 1; set => EditorPrefs.SetInt(nameof(Coordinator_EditorCoordinatePlay), value ? 1 : 0); }
+}
+/*
+ * 
+string defineSymbolsString = "SYMBOL1;SYMBOL2;SYMBOL3";
+BuildTargetGroup targetGroup = BuildTargetGroup.Standalone;
 
-        public static Editor PopulateEditorInfo(string path)
+PlayerSettings.SetScriptingDefineSymbols( NamedBuildTarget.FromBuildTargetGroup(targetGroup),  defineSymbolsString);
+ */
+public struct EditorInfo
+{
+    public string name;
+    public string projectPath;
+    public string assetPath;
+    public string projectSettingsPath;
+
+    public static EditorInfo PopulateEditorInfo(string path)
+    {
+        var pathByFolders = path.Split('/');
+        return new EditorInfo
         {
-            var pathByFolders = path.Split('/');
-            return new Editor
-            {
-                projectPath = path,
-                name = pathByFolders[pathByFolders.Length - 1],
-                assetPath = $"{path}/Assets",
-                projectSettingsPath = $"{path}/ProjectSettings"
-            };
+            projectPath = path,
+            name = pathByFolders[pathByFolders.Length - 1],
+            assetPath = $"{path}/Assets",
+            projectSettingsPath = $"{path}/ProjectSettings"
+        };
+    }
+}
+
+public static class Editors
+{
+    [InitializeOnLoadMethod]
+    public static void OnInitialize()
+    {
+        if (!IsAdditional()) {
+            UnityEngine.Debug.Log("Is Additional");
+            // Ideally we have one listener for the keep alive
+            // And the other for normal operations
+            SocketLayer.OpenListenerOnFile("operations");
+            EditorApplication.update += AdditionalUpdate;
+        } else {
+            UnityEngine.Debug.Log("Is Original");
+            SocketLayer.OpenSenderOnFile("operations");
+            EditorApplication.update += OriginalUpdate;
         }
     }
 
-    public enum Status
+    private static void OriginalUpdate()
     {
-        OK
+        throw new System.NotImplementedException();
     }
 
+    private static void AdditionalUpdate()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public static bool IsAdditional()
+    {
+        return System.Environment.CommandLine.Contains(CommandLineParams.Additional);
+    }
     public static string[] GetEditorsAvailable()
     {
-        var rootPath = Path.Combine(ProjectPath, "..");
+        var rootPath = Path.GetFullPath(Path.Combine(Paths.ProjectPath, ".."));
 
         return new List<string>(Directory.EnumerateDirectories(rootPath)).ToArray();
     }
 
-    public static Status CreateSymlinkEditor(Editor original, Editor additional)
-    {
-        Directory.CreateDirectory(additional.projectPath);
-        Symlink(original.assetPath, additional.assetPath);
-        Symlink(original.projectSettingsPath, additional.projectSettingsPath);
-        return Status.OK;
-    }
-
-    private static void Symlink(string sourcePath, string destinationPath)
+    public static void Symlink(string sourcePath, string destinationPath)
     {
         ExecuteBashCommandLine($"ln -s {sourcePath.Replace(" ", "\\ ")} {destinationPath.Replace(" ", "\\ ")}");
-    }
-
-    public static void OpenEditorPath(string editorPath)
-    {
-        UnityEngine.Debug.Assert(Directory.Exists(editorPath), "No editor at location");
-
-        Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{editorPath}\"");
     }
 
     private static void ExecuteBashCommandLine(string command)

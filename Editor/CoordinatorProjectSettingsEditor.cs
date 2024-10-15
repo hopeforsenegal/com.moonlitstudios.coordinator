@@ -16,7 +16,7 @@ namespace Editor
 
         public override void OnActivate(string searchContext, VisualElement rootElement)
         {
-            m_ProjectSettings = new SerializedObject(CoordinatorProjectSettings.LoadInstance());  // GetSerializedSettings();
+            m_ProjectSettings = new SerializedObject(CoordinatorProjectSettings.LoadInstance());
             m_Unused = m_ProjectSettings.FindProperty(nameof(CoordinatorProjectSettings.unused));
         }
 
