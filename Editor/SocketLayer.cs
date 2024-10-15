@@ -4,47 +4,47 @@ using UnityEngine;
 
 public static class SocketLayer
 {
-    static private string receiveFilePath;
-    static private bool isListening;
-    private static float RefreshInterval;
+    private static string sReceiveFilePath;
+    private static bool sIsListening;
+    private static float sRefreshInterval;
+    private static string sSendFilePath;
 
-    public static string receivedMessage;
-    private static string sendFilePath;
+    public static string ReceivedMessage;
 
     static SocketLayer() { EditorApplication.update += Update; }
 
     private static void Update()
     {
-        if (RefreshInterval > 0) {
-            RefreshInterval -= Time.deltaTime;
+        if (sRefreshInterval > 0) {
+            sRefreshInterval -= Time.deltaTime;
         } else {
-            RefreshInterval = .5f; // Refresh every half second
+            sRefreshInterval = .5f; // Refresh every half second
 
-            if (!isListening) return;
-            if (!File.Exists(receiveFilePath)) return;
+            if (!sIsListening) return;
+            if (!File.Exists(sReceiveFilePath)) return;
 
-            string message = File.ReadAllText(receiveFilePath);
+            var message = File.ReadAllText(sReceiveFilePath);
             if (!string.IsNullOrEmpty(message)) {
-                receivedMessage = message;
-                File.WriteAllText(receiveFilePath, "");
+                ReceivedMessage = message;
+                File.WriteAllText(sReceiveFilePath, "");
             }
         }
     }
 
     public static void OpenListenerOnFile(string path)
     {
-        UnityEngine.Debug.Log($"{nameof(OpenListenerOnFile)} {path}");
-        receiveFilePath = path;
-        isListening = true;
+        Debug.Log($"{nameof(OpenListenerOnFile)} {path}");
+        sReceiveFilePath = path;
+        sIsListening = true;
     }
     public static void OpenSenderOnFile(string path)
     {
-        UnityEngine.Debug.Log($"{nameof(OpenSenderOnFile)} {path}");
-        sendFilePath = path;
+        Debug.Log($"{nameof(OpenSenderOnFile)} {path}");
+        sSendFilePath = path;
     }
     public static void SendMessage(string message)
     {
-        UnityEngine.Debug.Log($"{nameof(SendMessage)} {message}");
-        File.WriteAllText(sendFilePath, message);
+        Debug.Log($"{nameof(SendMessage)} {message}");
+        File.WriteAllText(sSendFilePath, message);
     }
 }

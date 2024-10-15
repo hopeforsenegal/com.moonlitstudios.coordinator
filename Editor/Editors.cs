@@ -29,20 +29,20 @@ PlayerSettings.SetScriptingDefineSymbols( NamedBuildTarget.FromBuildTargetGroup(
  */
 public struct EditorInfo
 {
-    public string name;
-    public string projectPath;
-    public string assetPath;
-    public string projectSettingsPath;
+    public string Name;
+    public string ProjectPath;
+    public string AssetPath;
+    public string ProjectSettingsPath;
 
     public static EditorInfo PopulateEditorInfo(string path)
     {
         var pathByFolders = path.Split('/');
         return new EditorInfo
         {
-            projectPath = path,
-            name = pathByFolders[pathByFolders.Length - 1],
-            assetPath = $"{path}/Assets",
-            projectSettingsPath = $"{path}/ProjectSettings"
+            ProjectPath = path,
+            Name = pathByFolders[pathByFolders.Length - 1],
+            AssetPath = $"{path}/Assets",
+            ProjectSettingsPath = $"{path}/ProjectSettings",
         };
     }
 }
@@ -53,26 +53,24 @@ public static class Editors
     public static void OnInitialize()
     {
         if (!IsAdditional()) {
-            UnityEngine.Debug.Log("Is Additional");
-            // Ideally we have one listener for the keep alive
-            // And the other for normal operations
+            UnityEngine.Debug.Log("Is Original");
             SocketLayer.OpenListenerOnFile("operations");
+            SocketLayer.OpenSenderOnFile("keepalive");
             EditorApplication.update += AdditionalUpdate;
         } else {
-            UnityEngine.Debug.Log("Is Original");
+            UnityEngine.Debug.Log("Is Additional");
             SocketLayer.OpenSenderOnFile("operations");
+            SocketLayer.OpenListenerOnFile("keepalive");
             EditorApplication.update += OriginalUpdate;
         }
     }
 
     private static void OriginalUpdate()
     {
-        throw new System.NotImplementedException();
     }
 
     private static void AdditionalUpdate()
     {
-        throw new System.NotImplementedException();
     }
 
     public static bool IsAdditional()
@@ -93,7 +91,7 @@ public static class Editors
 
     private static void ExecuteBashCommandLine(string command)
     {
-        using (var proc = new Process()
+        using (var proc = new Process
         {
             StartInfo = new ProcessStartInfo
             {
@@ -102,8 +100,8 @@ public static class Editors
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                CreateNoWindow = true
-            }
+                CreateNoWindow = true,
+            },
         }) {
             proc.Start();
             proc.WaitForExit();
