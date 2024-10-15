@@ -1,15 +1,13 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
 
 public static class SocketLayer
 {
-    private static string sReceiveFilePath;
-    private static bool sIsListening;
     private static float sRefreshInterval;
-    private static string sSendFilePath;
 
-    public static string ReceivedMessage;
+    public static Dictionary<string, string> ReceivedMessage = new Dictionary<string, string>();
 
     static SocketLayer() { EditorApplication.update += Update; }
 
@@ -20,31 +18,36 @@ public static class SocketLayer
         } else {
             sRefreshInterval = .5f; // Refresh every half second
 
-            if (!sIsListening) return;
-            if (!File.Exists(sReceiveFilePath)) return;
-
-            var message = File.ReadAllText(sReceiveFilePath);
-            if (!string.IsNullOrEmpty(message)) {
-                ReceivedMessage = message;
-                File.WriteAllText(sReceiveFilePath, "");
+            if (ReceivedMessage.Count != 0) {
+                var messageToProcess = string.Empty;
+                var endPointToProcess = string.Empty;
+                foreach (var path in ReceivedMessage) {
+                    if (File.Exists(path.Key)) {
+                        var message = File.ReadAllText(path.Key);
+                        if (!string.IsNullOrEmpty(message)) {
+                            messageToProcess = message;
+                            endPointToProcess = path.Key;
+                            break;
+                        }
+                    }
+                }
+                if (!string.IsNullOrWhiteSpace(messageToProcess) && !string.IsNullOrWhiteSpace(endPointToProcess)) {
+                    ReceivedMessage[endPointToProcess] = messageToProcess;
+                    File.WriteAllText(endPointToProcess, string.Empty);
+                }
             }
         }
     }
 
     public static void OpenListenerOnFile(string path)
     {
-        Debug.Log($"{nameof(OpenListenerOnFile)} {path}");
-        sReceiveFilePath = path;
-        sIsListening = true;
+        Debug.Log($"{nameof(OpenListenerOnFile)} [{path}]");
+        ReceivedMessage[path] = string.Empty;
     }
-    public static void OpenSenderOnFile(string path)
+
+    public static void WriteMessage(string path, string message)
     {
-        Debug.Log($"{nameof(OpenSenderOnFile)} {path}");
-        sSendFilePath = path;
-    }
-    public static void SendMessage(string message)
-    {
-        Debug.Log($"{nameof(SendMessage)} {message}");
-        File.WriteAllText(sSendFilePath, message);
+        Debug.Log($"{nameof(WriteMessage)} [{path}] '{message}'");
+        File.WriteAllText(path, message);
     }
 }

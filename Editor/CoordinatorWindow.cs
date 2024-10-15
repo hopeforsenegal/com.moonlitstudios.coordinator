@@ -34,6 +34,7 @@ public class CoordinatorWindow : EditorWindow
     }
 
     private Visible m_Visible;
+    public const int MaximumAmountOfEditors = 6;
 
     protected void OnGUI()
     {
@@ -54,6 +55,7 @@ public class CoordinatorWindow : EditorWindow
                 events.Settings = GUILayout.Button("Settings");
                 events.Github = GUILayout.Button("Github");
                 GUILayout.EndHorizontal();
+                GUILayout.Space(10);
                 events.UpdateCoordinatePlay = GUILayout.Toggle(m_Visible.HasCoordinatePlay, "Coordinate Play Mode");
                 GUILayout.Space(10);
 
@@ -98,7 +100,7 @@ public class CoordinatorWindow : EditorWindow
             EditorGUILayout.HelpBox("Nothing to coordinate with. No additional editors are available yet.", MessageType.Info);
         }
 
-        events.EditorAdd = GUILayout.Button($"Add a {EditorUserSettings.Coordinator_EditorTypeOnCreate} Editor");
+        events.EditorAdd = (m_Visible.EditorAvailable.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorUserSettings.Coordinator_EditorTypeOnCreate} Editor");
         events.ShowInFinder = GUILayout.Button("Show editors in Finder") ? Paths.ProjectPath : events.ShowInFinder;
 
         /*- Events -*/
