@@ -57,13 +57,13 @@ public class CoordinatorWindow : EditorWindow
                 _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
 
                 foreach (var editor in m_Visible.EditorAvailable) {
-                    var editorInfo = EditorInfo.PopulateEditorInfo(editor);
+                    var editorInfo = EditorPaths.PopulateEditorInfo(editor);
                     GUILayout.BeginVertical();
                     EditorGUILayout.LabelField(editorInfo.Name);
 
                     GUILayout.BeginHorizontal();
-                    EditorGUILayout.TextField("Editor path", editorInfo.ProjectPath, EditorStyles.textField);
-                    events.ShowInFinder = GUILayout.Button("Open in Finder") ? editorInfo.ProjectPath : events.ShowInFinder;
+                    EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
+                    events.ShowInFinder = GUILayout.Button("Open in Finder") ? editorInfo.Path : events.ShowInFinder;
                     GUILayout.EndHorizontal();
 
                     EditorGUILayout.LabelField("Preprocessor Defines");
@@ -73,13 +73,13 @@ public class CoordinatorWindow : EditorWindow
                     EditorGUILayout.LabelField("On Play Params");
                     _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
 
-                    events.EditorOpen = GUILayout.Button("Run Editor") ? editorInfo.ProjectPath : events.EditorOpen;
+                    events.EditorOpen = GUILayout.Button("Run Editor") ? editorInfo.Path : events.EditorOpen;
                     if (GUILayout.Button("Delete Editor")) {
                         events.EditorDelete = EditorUtility.DisplayDialog(
                             "Delete this editor?",
                             "Are you sure you want to delete this editor?",
                             "Delete",
-                            "Cancel") ? editorInfo.ProjectPath : events.EditorDelete;
+                            "Cancel") ? editorInfo.Path : events.EditorDelete;
                     }
                     GUILayout.EndVertical();
                     GUILayout.Space(50);
@@ -102,13 +102,14 @@ public class CoordinatorWindow : EditorWindow
         }
         if (events.EditorAdd) {
             var path = Paths.ProjectPath;
-            var original = EditorInfo.PopulateEditorInfo(path);
-            var additional = EditorInfo.PopulateEditorInfo($"{path}Copy");
+            var original = EditorPaths.PopulateEditorInfo(path);
+            var additional = EditorPaths.PopulateEditorInfo($"{path}Copy");
 
-            Directory.CreateDirectory(additional.ProjectPath);
+            Directory.CreateDirectory(additional.Path);
             if (EditorUserSettings.Coordinator_EditorTypeOnCreate == EditorType.Symlink) {
-                Editors.Symlink(original.AssetPath, additional.AssetPath);
-                Editors.Symlink(original.ProjectSettingsPath, additional.ProjectSettingsPath);
+                Editors.Symlink(original.Assets, additional.Assets);
+                Editors.Symlink(original.ProjectSettings, additional.ProjectSettings);
+                Editors.Symlink(original.Packages, additional.Packages); // There is a world where you want different packages on your editors. In that case this part should be controlled by a setting. Defaulting to symlink for now though
                 // -- TODO mark that this is a symlink project and not a copy... so that the UI can show it!
             } else {
                 UnityEngine.Debug.Assert(false, "TODO !");

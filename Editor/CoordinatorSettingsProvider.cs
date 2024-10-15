@@ -34,16 +34,21 @@ namespace Editor
         public override void OnGUI(string searchContext)
         {
             var events = new Events();
+
+            /*- Render -*/
             GUILayout.Label("User/Editor Coordinator Settings:", EditorStyles.boldLabel);
             GUILayout.BeginHorizontal();
             GUILayout.Label("Editor Creation Mode:");
             for (var i = 0; i < EditorCreationOptions.Length; i++) events.SelectEditorType = GUILayout.Toggle(m_Visible.IndexSelectedOption == i, EditorCreationOptions[i]) ? i + 1 : 0;
+            // Things to consider are things like do we copy the library folder
+            // And what additional folders should we copy
             GUILayout.EndHorizontal();
             GUILayout.Space(10);
 
             GUILayout.Label("Project Coordinator Settings:", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(m_CommandLineParams);
 
+            /*- Events -*/
             if (events.SelectEditorType != default) {
                 m_Visible.IndexSelectedOption = events.SelectEditorType - 1;
                 EditorUserSettings.Coordinator_EditorTypeOnCreate = (EditorType)m_Visible.IndexSelectedOption;

@@ -13,12 +13,18 @@ public static class CommandLineParams
 public static class Paths
 {
     public static string ProjectPath { get; } = Application.dataPath.Replace("/Assets", "");
+    public static string ProjectRootPath { get; } = Path.GetFullPath(Path.Combine(ProjectPath, ".."));
 }
 public enum EditorType { Symlink, HardCopy }
 public static class EditorUserSettings
 {
     public static EditorType Coordinator_EditorTypeOnCreate { get => (EditorType)EditorPrefs.GetInt(nameof(Coordinator_EditorTypeOnCreate), (int)EditorType.Symlink); set => EditorPrefs.SetInt(nameof(Coordinator_EditorTypeOnCreate), (int)value); }
     public static bool Coordinator_EditorCoordinatePlay { get => EditorPrefs.GetInt(nameof(Coordinator_EditorCoordinatePlay), 0) == 1; set => EditorPrefs.SetInt(nameof(Coordinator_EditorCoordinatePlay), value ? 1 : 0); }
+}
+// SessionState is cleared when Unity exits. But survives domain reloads.
+public static class UntilExitSettings
+{
+    public static string Coordinator_ChildProcessIDs { get => SessionState.GetString(nameof(Coordinator_ChildProcessIDs), string.Empty); set => SessionState.SetString(nameof(Coordinator_ChildProcessIDs), value); }
 }
 /*
  * 
@@ -27,22 +33,24 @@ BuildTargetGroup targetGroup = BuildTargetGroup.Standalone;
 
 PlayerSettings.SetScriptingDefineSymbols( NamedBuildTarget.FromBuildTargetGroup(targetGroup),  defineSymbolsString);
  */
-public struct EditorInfo
+public struct EditorPaths
 {
     public string Name;
-    public string ProjectPath;
-    public string AssetPath;
-    public string ProjectSettingsPath;
+    public string Path;
+    public string Assets;
+    public string ProjectSettings;
+    public string Packages;
 
-    public static EditorInfo PopulateEditorInfo(string path)
+    public static EditorPaths PopulateEditorInfo(string path)
     {
         var pathByFolders = path.Split('/');
-        return new EditorInfo
+        return new EditorPaths
         {
-            ProjectPath = path,
+            Path = path,
             Name = pathByFolders[pathByFolders.Length - 1],
-            AssetPath = $"{path}/Assets",
-            ProjectSettingsPath = $"{path}/ProjectSettings",
+            Assets = $"{path}/{nameof(Assets)}",
+            ProjectSettings = $"{path}/{nameof(ProjectSettings)}",
+            Packages = $"{path}/{nameof(Packages)}",
         };
     }
 }
@@ -52,21 +60,35 @@ public static class Editors
     [InitializeOnLoadMethod]
     public static void OnInitialize()
     {
+        UnityEngine.Debug.Log("OnInitialize");
+
         if (!IsAdditional()) {
             UnityEngine.Debug.Log("Is Original");
-            SocketLayer.OpenListenerOnFile("operations");
-            SocketLayer.OpenSenderOnFile("keepalive");
-            EditorApplication.update += AdditionalUpdate;
+            SocketLayer.OpenSenderOnFile(Path.Combine(Paths.ProjectRootPath, "operations"));
+            SocketLayer.OpenListenerOnFile(Path.Combine(Paths.ProjectRootPath, "keepalive"));
+            EditorApplication.update += OriginalUpdate;
+            EditorApplication.playModeStateChanged += OriginalPlaymodeStateChanged;
         } else {
             UnityEngine.Debug.Log("Is Additional");
-            SocketLayer.OpenSenderOnFile("operations");
-            SocketLayer.OpenListenerOnFile("keepalive");
-            EditorApplication.update += OriginalUpdate;
+            SocketLayer.OpenListenerOnFile(Path.Combine(Paths.ProjectRootPath, "operations"));
+            SocketLayer.OpenSenderOnFile(Path.Combine(Paths.ProjectRootPath, "keepalive"));
+            EditorApplication.update += AdditionalUpdate;
+            SocketLayer.SendMessage("heyo");
         }
+    }
+
+    private static void OriginalPlaymodeStateChanged(PlayModeStateChange obj)
+    {
+        // here we right into the operations file when we go into playmode so that
+        // the additional goes into playmode as well
     }
 
     private static void OriginalUpdate()
     {
+        if (!string.IsNullOrWhiteSpace(SocketLayer.ReceivedMessage)) {
+            UnityEngine.Debug.Log($"We read message {SocketLayer.ReceivedMessage}");
+            SocketLayer.ReceivedMessage = string.Empty;
+        }
     }
 
     private static void AdditionalUpdate()
@@ -79,9 +101,7 @@ public static class Editors
     }
     public static string[] GetEditorsAvailable()
     {
-        var rootPath = Path.GetFullPath(Path.Combine(Paths.ProjectPath, ".."));
-
-        return new List<string>(Directory.EnumerateDirectories(rootPath)).ToArray();
+        return new List<string>(Directory.EnumerateDirectories(Paths.ProjectRootPath)).ToArray();
     }
 
     public static void Symlink(string sourcePath, string destinationPath)
@@ -104,6 +124,7 @@ public static class Editors
             },
         }) {
             proc.Start();
+            UntilExitSettings.Coordinator_ChildProcessIDs = proc.Id.ToString();
             proc.WaitForExit();
 
             if (!proc.StandardError.EndOfStream) {
