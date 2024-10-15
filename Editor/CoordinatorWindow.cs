@@ -20,7 +20,7 @@ public class CoordinatorWindow : EditorWindow
         public bool HasCoordinatePlay;
         public EditorsVisible Editors;
         public float RefreshInterval;
-        internal string[] EditorAvailable;
+        public string[] EditorAvailable;
     }
     public struct Events
     {
@@ -28,7 +28,9 @@ public class CoordinatorWindow : EditorWindow
         public string EditorOpen;
         public string EditorDelete;
         public string ShowInFinder;
-        internal bool UpdateCoordinatePlay;
+        public bool UpdateCoordinatePlay;
+        internal bool Settings;
+        internal bool Github;
     }
 
     private Visible m_Visible;
@@ -48,6 +50,10 @@ public class CoordinatorWindow : EditorWindow
         if (m_Visible.EditorAvailable.Length >= 2) {
             GUILayout.BeginVertical();
             {
+                GUILayout.BeginHorizontal();
+                events.Settings = GUILayout.Button("Settings");
+                events.Github = GUILayout.Button("Github");
+                GUILayout.EndHorizontal();
                 events.UpdateCoordinatePlay = GUILayout.Toggle(m_Visible.HasCoordinatePlay, "Coordinate Play Mode");
                 GUILayout.Space(10);
 
@@ -96,6 +102,12 @@ public class CoordinatorWindow : EditorWindow
         events.ShowInFinder = GUILayout.Button("Show editors in Finder") ? Paths.ProjectPath : events.ShowInFinder;
 
         /*- Events -*/
+        if (events.Github) {
+            Application.OpenURL("https://github.com/hopeforsenegal/com.moonlitstudios.coordinator");
+        }
+        if (events.Settings) {
+            SettingsService.OpenProjectSettings(Editor.CoordinatorSettingsProvider.MenuLocationInProjectSettings);
+        }
         if (events.UpdateCoordinatePlay) {
             m_Visible.HasCoordinatePlay = !m_Visible.HasCoordinatePlay;
             EditorUserSettings.Coordinator_EditorCoordinatePlay = m_Visible.HasCoordinatePlay;
@@ -117,13 +129,13 @@ public class CoordinatorWindow : EditorWindow
         }
         if (!string.IsNullOrWhiteSpace(events.EditorOpen)) {
             UnityEngine.Debug.Assert(Directory.Exists(events.EditorOpen), "No Editor at location");
-
             Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.AdditionalEditorParams}");
         }
         if (!string.IsNullOrWhiteSpace(events.EditorDelete)) {
             FileUtil.DeleteFileOrDirectory(events.EditorDelete);
         }
         if (!string.IsNullOrWhiteSpace(events.ShowInFinder)) {
+            UnityEngine.Debug.Assert(Directory.Exists(events.ShowInFinder), "Not a valid location");
             Process.Start(events.ShowInFinder);
         }
     }

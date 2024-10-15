@@ -10,6 +10,11 @@ public static class CommandLineParams
 
     public static string AdditionalEditorParams { get; } = string.Join(" ", Additional);
 }
+public static class Messages
+{
+    public const string Play = nameof(Play);
+    public const string Edit = nameof(Edit);
+}
 public static class Paths
 {
     public static string ProjectPath { get; } = Application.dataPath.Replace("/Assets", "");
@@ -65,15 +70,15 @@ public static class Editors
         if (!IsAdditional()) {
             UnityEngine.Debug.Log("Is Original");
             SocketLayer.OpenSenderOnFile(Path.Combine(Paths.ProjectRootPath, "operations"));
-            SocketLayer.OpenListenerOnFile(Path.Combine(Paths.ProjectRootPath, "keepalive"));
+            //SocketLayer.OpenListenerOnFile(Path.Combine(Paths.ProjectRootPath, "keepalive"));
             EditorApplication.update += OriginalUpdate;
             EditorApplication.playModeStateChanged += OriginalPlaymodeStateChanged;
         } else {
             UnityEngine.Debug.Log("Is Additional");
             SocketLayer.OpenListenerOnFile(Path.Combine(Paths.ProjectRootPath, "operations"));
-            SocketLayer.OpenSenderOnFile(Path.Combine(Paths.ProjectRootPath, "keepalive"));
+            //SocketLayer.OpenSenderOnFile(Path.Combine(Paths.ProjectRootPath, "keepalive"));
             EditorApplication.update += AdditionalUpdate;
-            SocketLayer.SendMessage("heyo");
+            //SocketLayer.SendMessage("heyo");
         }
     }
 
@@ -81,6 +86,10 @@ public static class Editors
     {
         // here we right into the operations file when we go into playmode so that
         // the additional goes into playmode as well
+        switch (obj) {
+            case PlayModeStateChange.EnteredPlayMode: SocketLayer.SendMessage(Messages.Play); break;
+            case PlayModeStateChange.EnteredEditMode: SocketLayer.SendMessage(Messages.Edit); break;
+        }
     }
 
     private static void OriginalUpdate()
@@ -93,6 +102,15 @@ public static class Editors
 
     private static void AdditionalUpdate()
     {
+        if (!string.IsNullOrWhiteSpace(SocketLayer.ReceivedMessage)) {
+            UnityEngine.Debug.Log($"We read message {SocketLayer.ReceivedMessage}");
+            switch (SocketLayer.ReceivedMessage) {
+                case Messages.Play: EditorApplication.isPlaying = true; break;
+                case Messages.Edit: EditorApplication.isPlaying = false; break;
+                default: break;
+            }
+            SocketLayer.ReceivedMessage = string.Empty;
+        }
     }
 
     public static bool IsAdditional()
