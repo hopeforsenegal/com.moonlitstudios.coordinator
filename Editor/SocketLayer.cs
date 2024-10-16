@@ -7,7 +7,7 @@ public static class SocketLayer
 {
     private static float sRefreshInterval;
 
-    public static Dictionary<string, string> ReceivedMessage = new Dictionary<string, string>();
+    public static readonly Dictionary<string, string> ReceivedMessage = new Dictionary<string, string>();
 
     static SocketLayer() { EditorApplication.update += Update; }
 
@@ -19,8 +19,7 @@ public static class SocketLayer
             sRefreshInterval = .5f; // Refresh every half second
 
             if (ReceivedMessage.Count != 0) {
-                var messageToProcess = string.Empty;
-                var endPointToProcess = string.Empty;
+                string messageToProcess = string.Empty, endPointToProcess = string.Empty;
                 foreach (var path in ReceivedMessage) {
                     if (File.Exists(path.Key)) {
                         var message = File.ReadAllText(path.Key);

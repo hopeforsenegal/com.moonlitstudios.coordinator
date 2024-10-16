@@ -5,16 +5,16 @@ using UnityEngine;
 
 public class CoordinatorWindow : EditorWindow
 {
-    [MenuItem("Moonlit/Coordinator/Coordinate")]
-    public static void ShowWindow()
-    {
-        GetWindow(typeof(CoordinatorWindow));
-    }
+    [MenuItem("Moonlit/Coordinator/Settings", priority = 0)]
+    private static void SendToProjectSettings() => SettingsService.OpenProjectSettings(CoordinatorSettingsProvider.MenuLocationInProjectSettings);
 
-    public struct EditorsVisible
-    {
-        public Vector2 ScrollPosition;
-    }
+    [MenuItem("Moonlit/Coordinator/Github", priority = 0)]
+    private static void SendToGithub() => Application.OpenURL("https://github.com/hopeforsenegal/com.moonlitstudios.coordinator");
+
+    [MenuItem("Moonlit/Coordinator/Coordinate", priority = 20)]
+    public static void ShowWindow() => GetWindow(typeof(CoordinatorWindow));
+
+    public struct EditorsVisible { public Vector2 ScrollPosition; }
     public struct Visible
     {
         public bool HasCoordinatePlay;
@@ -29,8 +29,8 @@ public class CoordinatorWindow : EditorWindow
         public string EditorDelete;
         public string ShowInFinder;
         public bool UpdateCoordinatePlay;
-        internal bool Settings;
-        internal bool Github;
+        public bool Settings;
+        public bool Github;
     }
 
     private Visible m_Visible;
@@ -108,7 +108,7 @@ public class CoordinatorWindow : EditorWindow
             Application.OpenURL("https://github.com/hopeforsenegal/com.moonlitstudios.coordinator");
         }
         if (events.Settings) {
-            SettingsService.OpenProjectSettings(Editor.CoordinatorSettingsProvider.MenuLocationInProjectSettings);
+            SettingsService.OpenProjectSettings(CoordinatorSettingsProvider.MenuLocationInProjectSettings);
         }
         if (events.UpdateCoordinatePlay) {
             m_Visible.HasCoordinatePlay = !m_Visible.HasCoordinatePlay;
