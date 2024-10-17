@@ -48,60 +48,64 @@ public class CoordinatorWindow : EditorWindow
         }
 
         /*- Render -*/
-        if (m_Visible.EditorAvailable.Length >= 2) {
-            GUILayout.BeginVertical();
-            {
-                GUILayout.BeginHorizontal();
-                events.Settings = GUILayout.Button("Settings");
-                events.Github = GUILayout.Button("Github");
-                GUILayout.EndHorizontal();
-                GUILayout.Space(10);
-                events.UpdateCoordinatePlay = GUILayout.Toggle(m_Visible.HasCoordinatePlay, "Coordinate Play Mode");
-                GUILayout.Space(10);
-
-                GUILayout.Label("Available Editors:");
-                m_Visible.Editors.ScrollPosition = EditorGUILayout.BeginScrollView(m_Visible.Editors.ScrollPosition);
-                EditorGUILayout.LabelField("Global Preprocessor Defines");
-                _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
-
-                foreach (var editor in m_Visible.EditorAvailable) {
-                    var editorInfo = EditorPaths.PopulateEditorInfo(editor);
-                    GUILayout.BeginVertical();
-                    EditorGUILayout.LabelField(editorInfo.Name);
-
-                    GUILayout.BeginHorizontal();
-                    EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
-                    events.ShowInFinder = GUILayout.Button("Open in Finder") ? editorInfo.Path : events.ShowInFinder;
-                    GUILayout.EndHorizontal();
-
-                    EditorGUILayout.LabelField("Preprocessor Defines");
-                    _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
-                    EditorGUILayout.LabelField("Command Line Params");
-                    _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
-                    EditorGUILayout.LabelField("On Play Params");
-                    _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
-
-                    events.EditorOpen = GUILayout.Button("Run Editor") ? editorInfo.Path : events.EditorOpen;
-                    if (GUILayout.Button("Delete Editor")) {
-                        events.EditorDelete = EditorUtility.DisplayDialog(
-                            "Delete this editor?",
-                            "Are you sure you want to delete this editor?",
-                            "Delete",
-                            "Cancel") ? editorInfo.Path : events.EditorDelete;
-                    }
-                    GUILayout.EndVertical();
-                    GUILayout.Space(50);
-                }
-
-                EditorGUILayout.EndScrollView();
-            }
-            GUILayout.EndVertical();
+        if (Editors.IsAdditional()) {
+            EditorGUILayout.HelpBox($"You can only launch additional editors from the original editor.", MessageType.Info);
         } else {
-            EditorGUILayout.HelpBox("Nothing to coordinate with. No additional editors are available yet.", MessageType.Info);
-        }
+            if (m_Visible.EditorAvailable.Length >= 2) {
+                GUILayout.BeginVertical();
+                {
+                    GUILayout.BeginHorizontal();
+                    events.Settings = GUILayout.Button("Settings");
+                    events.Github = GUILayout.Button("Github");
+                    GUILayout.EndHorizontal();
+                    GUILayout.Space(10);
+                    events.UpdateCoordinatePlay = GUILayout.Toggle(m_Visible.HasCoordinatePlay, "Coordinate Play Mode");
+                    GUILayout.Space(10);
 
-        events.EditorAdd = (m_Visible.EditorAvailable.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorUserSettings.Coordinator_EditorTypeOnCreate} Editor");
-        events.ShowInFinder = GUILayout.Button("Show editors in Finder") ? Paths.ProjectPath : events.ShowInFinder;
+                    GUILayout.Label("Available Editors:");
+                    m_Visible.Editors.ScrollPosition = EditorGUILayout.BeginScrollView(m_Visible.Editors.ScrollPosition);
+                    EditorGUILayout.LabelField("Global Preprocessor Defines");
+                    _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
+
+                    foreach (var editor in m_Visible.EditorAvailable) {
+                        var editorInfo = EditorPaths.PopulateEditorInfo(editor);
+                        GUILayout.BeginVertical();
+                        EditorGUILayout.LabelField(editorInfo.Name);
+
+                        GUILayout.BeginHorizontal();
+                        EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
+                        events.ShowInFinder = GUILayout.Button("Open in Finder") ? editorInfo.Path : events.ShowInFinder;
+                        GUILayout.EndHorizontal();
+
+                        EditorGUILayout.LabelField("Preprocessor Defines");
+                        _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
+                        EditorGUILayout.LabelField("Command Line Params");
+                        _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
+                        EditorGUILayout.LabelField("On Play Params");
+                        _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
+
+                        events.EditorOpen = GUILayout.Button("Run Editor") ? editorInfo.Path : events.EditorOpen;
+                        if (GUILayout.Button("Delete Editor")) {
+                            events.EditorDelete = EditorUtility.DisplayDialog(
+                                "Delete this editor?",
+                                "Are you sure you want to delete this editor?",
+                                "Delete",
+                                "Cancel") ? editorInfo.Path : events.EditorDelete;
+                        }
+                        GUILayout.EndVertical();
+                        GUILayout.Space(50);
+                    }
+
+                    EditorGUILayout.EndScrollView();
+                }
+                GUILayout.EndVertical();
+            } else {
+                EditorGUILayout.HelpBox("Nothing to coordinate with. No additional editors are available yet.", MessageType.Info);
+            }
+
+            events.EditorAdd = (m_Visible.EditorAvailable.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorUserSettings.Coordinator_EditorTypeOnCreate} Editor");
+            events.ShowInFinder = GUILayout.Button("Show editors in Finder") ? Paths.ProjectPath : events.ShowInFinder;
+        }
 
         /*- Events -*/
         if (events.Github) {

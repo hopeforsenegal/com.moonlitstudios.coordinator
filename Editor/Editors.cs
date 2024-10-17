@@ -74,9 +74,10 @@ public static class Editors
             UnityEngine.Debug.Log("Is Original");
             EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged;
             var path = EditorSceneManager.GetActiveScene().path;
-            UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(EditorSceneManager.GetActiveScene().name));
-            UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(path));
-            SocketLayer.WriteMessage(MessageEndpoint.Scene, path);
+            if (!string.IsNullOrWhiteSpace(path)) {
+                UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(EditorSceneManager.GetActiveScene().name));
+                SocketLayer.WriteMessage(MessageEndpoint.Scene, path);
+            }
         } else {
             UnityEngine.Debug.Log("Is Additional");
             SocketLayer.OpenListenerOnFile(MessageEndpoint.Playmode);
@@ -108,9 +109,8 @@ public static class Editors
             sRefreshInterval = .5f; // Refresh every half second
 
             if (int.TryParse(UntilExitSettings.Coordinator_ParentProcessID, out var processId)) {
-                UnityEngine.Debug.Log($"The original '{UntilExitSettings.Coordinator_ParentProcessID}' closed so we should close ourselves");
-                var p = Process.GetProcessById(processId);
-                if (p.HasExited) {
+                if (Process.GetProcessById(processId).HasExited) {
+                    UnityEngine.Debug.Log($"The original '{UntilExitSettings.Coordinator_ParentProcessID}' closed so we should close ourselves");
                     Process.GetCurrentProcess().Kill();
                 }
             }
