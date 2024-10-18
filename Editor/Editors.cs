@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -17,7 +18,7 @@ public static class CommandLineParams
 public static class MessageEndpoint
 {
     public static string Playmode { get; } = Path.Combine(Paths.ProjectRootPath, nameof(PlayModeStateChange));
-    public static string Scene { get; } = Path.Combine(Paths.ProjectRootPath, nameof(Scene));
+    public static string Scene { get; } = Path.Combine(Paths.ProjectRootPath, nameof(UnityEngine.SceneManagement.Scene));
 }
 public static class Messages
 {
@@ -34,9 +35,42 @@ public static class EditorUserSettings
     public static EditorType Coordinator_EditorTypeOnCreate { get => (EditorType)EditorPrefs.GetInt(nameof(Coordinator_EditorTypeOnCreate), (int)EditorType.Symlink); set => EditorPrefs.SetInt(nameof(Coordinator_EditorTypeOnCreate), (int)value); }
     public static bool Coordinator_EditorCoordinatePlay { get => EditorPrefs.GetInt(nameof(Coordinator_EditorCoordinatePlay), 0) == 1; set => EditorPrefs.SetInt(nameof(Coordinator_EditorCoordinatePlay), value ? 1 : 0); }
 }
+public struct PathToProcessId
+{   // Format is 'long/project/path|1234124' and we store all of them seperated by ;
+    public string path;
+    public int processID;
+    public const string Seperator = "|";
+    public const string End = ";";
+
+    public static string Join(params PathToProcessId[] pathToProcesIds)
+    {
+        var result = string.Empty;
+        foreach (var p in pathToProcesIds) {
+            result += $"{p.path}{Seperator}{p.processID}{End}";
+        }
+        return result;
+    }
+    public static PathToProcessId[] Split(string toParse)
+    {
+        var pathToProcessIdSplit = toParse.Split(End);
+        var result = new List<PathToProcessId>();
+        foreach (var p in pathToProcessIdSplit) {
+            if (string.IsNullOrWhiteSpace(p)) continue;
+
+            var split = p.Split(Seperator);
+            if (int.TryParse(split[1], out var resultProcessId)) {
+                result.Add(new PathToProcessId { path = split[0], processID = resultProcessId });
+            } else {
+                UnityEngine.Debug.LogWarning($"We failed to parse the {nameof(PathToProcessId)} on path '{split[0]}'");
+            }
+        }
+        return result.ToArray();
+    }
+}
 public static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
 {
     public static string Coordinator_ParentProcessID { get => SessionState.GetString(nameof(Coordinator_ParentProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ParentProcessID), value); }
+    public static string Coordinator_ProjectPathToChildProcessID { get => SessionState.GetString(nameof(Coordinator_ProjectPathToChildProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ProjectPathToChildProcessID), value); }
 }
 public struct EditorPaths
 {
@@ -82,7 +116,7 @@ public static class Editors
             UnityEngine.Debug.Log("Is Additional");
             SocketLayer.OpenListenerOnFile(MessageEndpoint.Playmode);
             SocketLayer.OpenListenerOnFile(MessageEndpoint.Scene);
-            var args = System.Environment.GetCommandLineArgs();
+            var args = Environment.GetCommandLineArgs();
             for (var i = 0; i < args.Length; i++) {
                 var arg = args[i];
                 if (arg == CommandLineParams.Original) {
@@ -101,6 +135,12 @@ public static class Editors
         }
     }
 
+    public static bool IsProcessAlive(int processId)
+    {
+        try { return !Process.GetProcessById(processId).HasExited; }
+        catch (ArgumentException) { return false; } // this should suffice unless we throw ArgumentException for multiple reasons
+    }
+
     private static void AdditionalUpdate()
     {
         if (sRefreshInterval > 0) {
@@ -109,7 +149,7 @@ public static class Editors
             sRefreshInterval = .5f; // Refresh every half second
 
             if (int.TryParse(UntilExitSettings.Coordinator_ParentProcessID, out var processId)) {
-                if (Process.GetProcessById(processId).HasExited) {
+                if (!IsProcessAlive(processId)) {
                     UnityEngine.Debug.Log($"The original '{UntilExitSettings.Coordinator_ParentProcessID}' closed so we should close ourselves");
                     Process.GetCurrentProcess().Kill();
                 }

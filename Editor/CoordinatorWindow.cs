@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using UnityEditor;
@@ -21,11 +22,13 @@ public class CoordinatorWindow : EditorWindow
         public EditorsVisible Editors;
         public float RefreshInterval;
         public string[] EditorAvailable;
+        internal PathToProcessId[] PathToProcessIds;
     }
     public struct Events
     {
         public bool EditorAdd;
         public string EditorOpen;
+        public string EditorClose;
         public string EditorDelete;
         public string ShowInFinder;
         public bool UpdateCoordinatePlay;
@@ -44,20 +47,32 @@ public class CoordinatorWindow : EditorWindow
             m_Visible.RefreshInterval -= Time.deltaTime;
         } else {
             m_Visible.RefreshInterval = .5f; // Refresh every half second
+            ////////////////////////
+            var pathToProcessIds = PathToProcessId.Split(UntilExitSettings.Coordinator_ProjectPathToChildProcessID);
+            var updatedListOfProcesses = new List<PathToProcessId>();
+            foreach (var p in pathToProcessIds) {
+                if (Editors.IsProcessAlive(p.processID)) {
+                    updatedListOfProcesses.Add(p);
+                }
+            }
+
+            m_Visible.PathToProcessIds = updatedListOfProcesses.ToArray();
             m_Visible.EditorAvailable = Editors.GetEditorsAvailable();
         }
 
         /*- Render -*/
+        GUILayout.BeginHorizontal();
+        events.Settings = GUILayout.Button("Settings");
+        events.Github = GUILayout.Button("Github");
+        GUILayout.EndHorizontal();
+
+        EditorGUI.BeginDisabledGroup(EditorApplication.isPlaying);
         if (Editors.IsAdditional()) {
             EditorGUILayout.HelpBox($"You can only launch additional editors from the original editor.", MessageType.Info);
         } else {
             if (m_Visible.EditorAvailable.Length >= 2) {
                 GUILayout.BeginVertical();
                 {
-                    GUILayout.BeginHorizontal();
-                    events.Settings = GUILayout.Button("Settings");
-                    events.Github = GUILayout.Button("Github");
-                    GUILayout.EndHorizontal();
                     GUILayout.Space(10);
                     events.UpdateCoordinatePlay = GUILayout.Toggle(m_Visible.HasCoordinatePlay, "Coordinate Play Mode");
                     GUILayout.Space(10);
@@ -84,7 +99,22 @@ public class CoordinatorWindow : EditorWindow
                         EditorGUILayout.LabelField("On Play Params");
                         _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
 
-                        events.EditorOpen = GUILayout.Button("Run Editor") ? editorInfo.Path : events.EditorOpen;
+
+                        GUILayout.BeginHorizontal();
+                        var isRunningProject = false;
+                        foreach (var p in m_Visible.PathToProcessIds) {
+                            if (p.path == editorInfo.Path) {
+                                isRunningProject = true;
+                                break;
+                            }
+                        }
+                        EditorGUI.BeginDisabledGroup(isRunningProject);
+                        events.EditorOpen = GUILayout.Button("Open Editor") ? editorInfo.Path : events.EditorOpen;
+                        EditorGUI.EndDisabledGroup();
+                        EditorGUI.BeginDisabledGroup(!isRunningProject);
+                        events.EditorClose = GUILayout.Button("Close Editor") ? editorInfo.Path : events.EditorClose;
+                        EditorGUI.EndDisabledGroup();
+                        GUILayout.EndHorizontal();
                         if (GUILayout.Button("Delete Editor")) {
                             events.EditorDelete = EditorUtility.DisplayDialog(
                                 "Delete this editor?",
@@ -104,7 +134,8 @@ public class CoordinatorWindow : EditorWindow
             }
 
             events.EditorAdd = (m_Visible.EditorAvailable.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorUserSettings.Coordinator_EditorTypeOnCreate} Editor");
-            events.ShowInFinder = GUILayout.Button("Show editors in Finder") ? Paths.ProjectPath : events.ShowInFinder;
+            EditorGUI.EndDisabledGroup();
+            events.ShowInFinder = GUILayout.Button("Show Editors in Finder") ? Paths.ProjectPath : events.ShowInFinder;
         }
 
         /*- Events -*/
@@ -135,7 +166,20 @@ public class CoordinatorWindow : EditorWindow
         }
         if (!string.IsNullOrWhiteSpace(events.EditorOpen)) {
             UnityEngine.Debug.Assert(Directory.Exists(events.EditorOpen), "No Editor at location");
-            Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.AdditionalEditorParams}");
+            var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.AdditionalEditorParams}");
+            var processIds = new List<PathToProcessId>(m_Visible.PathToProcessIds);
+            processIds.Add(new PathToProcessId { path = events.EditorOpen, processID = process.Id });
+            UntilExitSettings.Coordinator_ProjectPathToChildProcessID = PathToProcessId.Join(processIds.ToArray());
+            m_Visible.PathToProcessIds = processIds.ToArray();
+        }
+        if (!string.IsNullOrWhiteSpace(events.EditorClose)) {
+            var pathToProcessIds = m_Visible.PathToProcessIds;
+            foreach (var p in pathToProcessIds) {
+                if (p.path == events.EditorClose) {
+                    Process.GetProcessById(p.processID).Kill(); // Is calling Kill twice bad? probably not so we don't need to update local memory
+                    break;
+                }
+            }
         }
         if (!string.IsNullOrWhiteSpace(events.EditorDelete)) {
             FileUtil.DeleteFileOrDirectory(events.EditorDelete);
