@@ -38,6 +38,7 @@ public class CoordinatorWindow : EditorWindow
 
     private Visible m_Visible;
     public const int MaximumAmountOfEditors = 6;
+    readonly public string[] scriptingDefineSymbols = new string[MaximumAmountOfEditors];
 
     protected void OnGUI()
     {
@@ -79,11 +80,17 @@ public class CoordinatorWindow : EditorWindow
 
                     GUILayout.Label("Available Editors:");
                     m_Visible.Editors.ScrollPosition = EditorGUILayout.BeginScrollView(m_Visible.Editors.ScrollPosition);
-                    EditorGUILayout.LabelField("Global Preprocessor Defines");
-                    _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
 
-                    foreach (var editor in m_Visible.EditorAvailable) {
+                    for (int i = 0; i < m_Visible.EditorAvailable.Length; i++) {
+                        string editor = m_Visible.EditorAvailable[i];
                         var editorInfo = EditorPaths.PopulateEditorInfo(editor);
+                        var isRunningProject = false;
+                        foreach (var p in m_Visible.PathToProcessIds) {
+                            if (p.path == editorInfo.Path) {
+                                isRunningProject = true;
+                                break;
+                            }
+                        }
                         GUILayout.BeginVertical();
                         EditorGUILayout.LabelField(editorInfo.Name);
 
@@ -92,22 +99,25 @@ public class CoordinatorWindow : EditorWindow
                         events.ShowInFinder = GUILayout.Button("Open in Finder") ? editorInfo.Path : events.ShowInFinder;
                         GUILayout.EndHorizontal();
 
-                        EditorGUILayout.LabelField("Preprocessor Defines");
-                        _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
+
+                        // store the [scripting define symbols] in the project settings
+                        //      How do we do this per Editor in a non clunky way?
+                        // the additional editors are going to pull it from the project settings (which is symlinked by default)
+                        // pull current symbols and join it with the ones from project settings
+                        // then go into play (since this is the only time it matters)
+                        // then when exiting play remove them (since we don't want to permanently alter the project)
+
+
+                        EditorGUI.BeginDisabledGroup(isRunningProject);
                         EditorGUILayout.LabelField("Command Line Params");
                         _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
+                        EditorGUI.EndDisabledGroup();
+                        EditorGUILayout.LabelField("Scripting Define Symbols (Updates on editor before 'Play')");
+                        scriptingDefineSymbols[i] = EditorGUILayout.TextArea(scriptingDefineSymbols[i], GUILayout.Height(40), GUILayout.MaxWidth(200));
                         EditorGUILayout.LabelField("On Play Params");
                         _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
 
-
                         GUILayout.BeginHorizontal();
-                        var isRunningProject = false;
-                        foreach (var p in m_Visible.PathToProcessIds) {
-                            if (p.path == editorInfo.Path) {
-                                isRunningProject = true;
-                                break;
-                            }
-                        }
                         EditorGUI.BeginDisabledGroup(isRunningProject);
                         events.EditorOpen = GUILayout.Button("Open Editor") ? editorInfo.Path : events.EditorOpen;
                         EditorGUI.EndDisabledGroup();
@@ -135,7 +145,7 @@ public class CoordinatorWindow : EditorWindow
 
             events.EditorAdd = (m_Visible.EditorAvailable.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorUserSettings.Coordinator_EditorTypeOnCreate} Editor");
             EditorGUI.EndDisabledGroup();
-            events.ShowInFinder = GUILayout.Button("Show Editors in Finder") ? Paths.ProjectPath : events.ShowInFinder;
+            events.ShowInFinder = GUILayout.Button("Show Editors in Finder") ? Paths.ProjectRootPath : events.ShowInFinder;
         }
 
         /*- Events -*/

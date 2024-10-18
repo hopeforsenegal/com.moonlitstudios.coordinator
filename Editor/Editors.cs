@@ -212,7 +212,7 @@ public static class Editors
 /*
  * The way my projects are set up the TEST_DEBUG scripting define needs to be set in order to run tests  (Since I don't want to accidentally compile it in a real build)
 string defineSymbolsString = "SYMBOL1;SYMBOL2;SYMBOL3";
-BuildTargetGroup targetGroup = BuildTargetGroup.Standalone;
 
-PlayerSettings.SetScriptingDefineSymbols( NamedBuildTarget.FromBuildTargetGroup(targetGroup),  defineSymbolsString);
+PlayerSettings.SetScriptingDefineSymbols( NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone),  defineSymbolsString);
+AssetDatabase.Refresh();
  */
