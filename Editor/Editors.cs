@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public enum EditorType { Symlink, HardCopy }
 public static class CommandLineParams
@@ -22,8 +24,8 @@ public static class MessageEndpoint
 }
 public static class Messages
 {
-    public const string Play = nameof(Play);
     public const string Edit = nameof(Edit);
+    internal static string Play(string[] scriptingDefineSymbols) => $"{nameof(Play)}|{string.Join(";", scriptingDefineSymbols)}";
 }
 public static class Paths
 {
@@ -35,6 +37,11 @@ public static class EditorUserSettings
     public static EditorType Coordinator_EditorTypeOnCreate { get => (EditorType)EditorPrefs.GetInt(nameof(Coordinator_EditorTypeOnCreate), (int)EditorType.Symlink); set => EditorPrefs.SetInt(nameof(Coordinator_EditorTypeOnCreate), (int)value); }
     public static bool Coordinator_EditorCoordinatePlay { get => EditorPrefs.GetInt(nameof(Coordinator_EditorCoordinatePlay), 0) == 1; set => EditorPrefs.SetInt(nameof(Coordinator_EditorCoordinatePlay), value ? 1 : 0); }
 }
+public static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
+{
+    public static string Coordinator_ParentProcessID { get => SessionState.GetString(nameof(Coordinator_ParentProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ParentProcessID), value); }
+    public static string Coordinator_ProjectPathToChildProcessID { get => SessionState.GetString(nameof(Coordinator_ProjectPathToChildProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ProjectPathToChildProcessID), value); }
+}
 public struct PathToProcessId
 {   // Format is 'long/project/path|1234124' and we store all of them seperated by ;
     public string path;
@@ -45,9 +52,7 @@ public struct PathToProcessId
     public static string Join(params PathToProcessId[] pathToProcesIds)
     {
         var result = string.Empty;
-        foreach (var p in pathToProcesIds) {
-            result += $"{p.path}{Seperator}{p.processID}{End}";
-        }
+        foreach (var p in pathToProcesIds) result += $"{p.path}{Seperator}{p.processID}{End}";
         return result;
     }
     public static PathToProcessId[] Split(string toParse)
@@ -66,11 +71,6 @@ public struct PathToProcessId
         }
         return result.ToArray();
     }
-}
-public static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
-{
-    public static string Coordinator_ParentProcessID { get => SessionState.GetString(nameof(Coordinator_ParentProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ParentProcessID), value); }
-    public static string Coordinator_ProjectPathToChildProcessID { get => SessionState.GetString(nameof(Coordinator_ProjectPathToChildProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ProjectPathToChildProcessID), value); }
 }
 public struct EditorPaths
 {
@@ -96,22 +96,22 @@ public struct EditorPaths
 
 public static class Editors
 {
+    private static float RefreshInterval;
     private static readonly List<string> EndPointsToProcess = new List<string>();
-    private static float sRefreshInterval;
+    private static readonly SessionStateConvenientListInt Playmode = new SessionStateConvenientListInt(nameof(Playmode));
 
     [InitializeOnLoadMethod]
     public static void OnInitialize()
     {
-        UnityEngine.Debug.Log(nameof(OnInitialize));
-
         if (!IsAdditional()) {
             UnityEngine.Debug.Log("Is Original");
-            EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged;
             var path = EditorSceneManager.GetActiveScene().path;
             if (!string.IsNullOrWhiteSpace(path)) {
                 UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(EditorSceneManager.GetActiveScene().name));
                 SocketLayer.WriteMessage(MessageEndpoint.Scene, path);
             }
+            EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Without being in a InitializeOnLoadMethod, the EnteredPlaymode event will get dropped in OriginalCoordinatePlaymodeStateChanged. We also cannot put that functionality in a EditorWindow/CoordinatorWindow
+            EditorApplication.update += OriginalUpdate;
         } else {
             UnityEngine.Debug.Log("Is Additional");
             SocketLayer.OpenListenerOnFile(MessageEndpoint.Playmode);
@@ -127,26 +127,38 @@ public static class Editors
         }
     }
 
-    private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
+    private static void OriginalUpdate()
     {
-        switch (playmodeState) {
-            case PlayModeStateChange.EnteredPlayMode: SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Play); break;
-            case PlayModeStateChange.EnteredEditMode: SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Edit); break;
+        if (RefreshInterval > 0) {
+            RefreshInterval -= Time.deltaTime;
+        } else {
+            RefreshInterval = .5f; // Refresh every half second
+            ////////////////////////
+
+            if (Playmode.Count() > 0) {
+                var playmode = (PlayModeStateChange)Playmode.Dequeue();
+                UnityEngine.Debug.Log($"Writing command '{playmode}'");
+                switch (playmode) {
+                    case PlayModeStateChange.EnteredPlayMode: SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Play(ProjectSettings.LoadInstance().scriptingDefineSymbols)); break;
+                    case PlayModeStateChange.EnteredEditMode: SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Edit); break;
+                }
+            }
         }
     }
 
-    public static bool IsProcessAlive(int processId)
+    private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
-        try { return !Process.GetProcessById(processId).HasExited; }
-        catch (ArgumentException) { return false; } // this should suffice unless we throw ArgumentException for multiple reasons
+        if (playmodeState == PlayModeStateChange.EnteredPlayMode || playmodeState == PlayModeStateChange.EnteredEditMode) {
+            Playmode.Queue((int)playmodeState);
+        }
     }
 
     private static void AdditionalUpdate()
     {
-        if (sRefreshInterval > 0) {
-            sRefreshInterval -= Time.deltaTime;
+        if (RefreshInterval > 0) {
+            RefreshInterval -= Time.deltaTime;
         } else {
-            sRefreshInterval = .5f; // Refresh every half second
+            RefreshInterval = .5f; // Refresh every half second
 
             if (int.TryParse(UntilExitSettings.Coordinator_ParentProcessID, out var processId)) {
                 if (!IsProcessAlive(processId)) {
@@ -162,13 +174,26 @@ public static class Editors
                 EndPointsToProcess.Add(endpoint);
                 UnityEngine.Debug.Log($"We consumed message '{message}'");
                 if (endpoint == MessageEndpoint.Playmode) {
-                    switch (message) {
-                        case Messages.Play: EditorApplication.isPlaying = true; break;
-                        case Messages.Edit: EditorApplication.isPlaying = false; break;
+                    var split = message.Split("|");
+                    if (split.Length == 2) {
+                        UnityEngine.Debug.Log($"Doing asset database refresh. Updating Scripting Defines '{split[1]}'");
+                        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone), split[1]);
+                        AssetDatabase.Refresh();
+                    }
+
+                    switch (split[0]) {
+                        case nameof(Messages.Play): EditorApplication.isPlaying = true; break;
+                        case nameof(Messages.Edit): EditorApplication.isPlaying = false; break;
                     }
                 }
                 if (endpoint == MessageEndpoint.Scene) {
-                    EditorSceneManager.OpenScene(message);
+                    if (SceneManager.GetActiveScene().path != message) {
+                        if (Application.isPlaying) {
+                            SceneManager.LoadScene(message);
+                        } else {
+                            EditorSceneManager.OpenScene(message);
+                        }
+                    }
                 }
             }
         }
@@ -177,8 +202,14 @@ public static class Editors
         }
     }
 
-    public static bool IsAdditional() => System.Environment.CommandLine.Contains(CommandLineParams.Additional);
+    public static bool IsAdditional() => Environment.CommandLine.Contains(CommandLineParams.Additional);
     public static string[] GetEditorsAvailable() => new List<string>(Directory.EnumerateDirectories(Paths.ProjectRootPath)).ToArray();
+
+    public static bool IsProcessAlive(int processId)
+    {
+        try { return !Process.GetProcessById(processId).HasExited; }
+        catch (ArgumentException) { return false; } // this should suffice unless we throw ArgumentException for multiple reasons
+    }
 
     public static void Symlink(string sourcePath, string destinationPath)
     {
@@ -209,10 +240,3 @@ public static class Editors
         }
     }
 }
-/*
- * The way my projects are set up the TEST_DEBUG scripting define needs to be set in order to run tests  (Since I don't want to accidentally compile it in a real build)
-string defineSymbolsString = "SYMBOL1;SYMBOL2;SYMBOL3";
-
-PlayerSettings.SetScriptingDefineSymbols( NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone),  defineSymbolsString);
-AssetDatabase.Refresh();
- */

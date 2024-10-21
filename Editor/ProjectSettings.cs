@@ -15,9 +15,10 @@ public class ProjectSettings : ScriptableObject
             Directory.CreateDirectory(CoordinatorSettingsResDir);
             instance = CreateInstance<ProjectSettings>();
             instance.commandlineParams = "-coordinator";
+            instance.scriptingDefineSymbols = new string[CoordinatorWindow.MaximumAmountOfEditors];
 #if UNITY_EDITOR
             AssetDatabase.CreateAsset(instance, Path.Combine(CoordinatorSettingsResDir, $"{CoordinatorSettingsFile}.asset"));
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(instance);
 #endif
         }
 
@@ -25,7 +26,5 @@ public class ProjectSettings : ScriptableObject
     }
 
     public string commandlineParams; // pass -coordinator flag to everyone
-
-    // Preprocessor Defines, Command line Params, & On Play Param, should not differ from person to person (just whether or not they are used for that run/session is)
-    // So it makes a lot of sense that they will be stored and perhaps editable here!
+    public string[] scriptingDefineSymbols;
 }

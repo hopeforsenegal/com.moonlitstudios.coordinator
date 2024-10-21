@@ -15,10 +15,16 @@ public class CoordinatorWindow : EditorWindow
     [MenuItem("Moonlit/Coordinator/Coordinate", priority = 20)]
     public static void ShowWindow() => GetWindow(typeof(CoordinatorWindow));
 
-    public struct EditorsVisible { public Vector2 ScrollPosition; }
+    public struct EditorsVisible
+    {
+        public Vector2 ScrollPosition;
+        public string[] scriptingDefineSymbols;
+        public string[] previousScriptingDefineSymbols;
+    }
     public struct Visible
     {
         public bool HasCoordinatePlay;
+        public bool PreviousHasCoordinatePlay;
         public EditorsVisible Editors;
         public float RefreshInterval;
         public string[] EditorAvailable;
@@ -38,7 +44,22 @@ public class CoordinatorWindow : EditorWindow
 
     private Visible m_Visible;
     public const int MaximumAmountOfEditors = 6;
-    readonly public string[] scriptingDefineSymbols = new string[MaximumAmountOfEditors];
+    public static ProjectSettings ProjectSettingsInMemory;
+
+    protected void CreateGUI()
+    {
+        m_Visible.HasCoordinatePlay = EditorUserSettings.Coordinator_EditorCoordinatePlay;
+        m_Visible.Editors.scriptingDefineSymbols = new string[MaximumAmountOfEditors];
+        m_Visible.Editors.previousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
+        ProjectSettingsInMemory = ProjectSettings.LoadInstance();
+        var existingDefines = ProjectSettingsInMemory.scriptingDefineSymbols;
+        for (int i = 0; i < MaximumAmountOfEditors && i < existingDefines.Length; i++) {
+            UnityEngine.Debug.Log($"Retrieving {existingDefines[i]}");
+            m_Visible.Editors.scriptingDefineSymbols[i] = existingDefines[i];
+            m_Visible.Editors.previousScriptingDefineSymbols[i] = existingDefines[i];
+        }
+        EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
+    }
 
     protected void OnGUI()
     {
@@ -75,7 +96,8 @@ public class CoordinatorWindow : EditorWindow
                 GUILayout.BeginVertical();
                 {
                     GUILayout.Space(10);
-                    events.UpdateCoordinatePlay = GUILayout.Toggle(m_Visible.HasCoordinatePlay, "Coordinate Play Mode");
+                    m_Visible.HasCoordinatePlay = GUILayout.Toggle(m_Visible.HasCoordinatePlay, "Coordinate Play Mode");
+                    events.UpdateCoordinatePlay = m_Visible.HasCoordinatePlay != m_Visible.PreviousHasCoordinatePlay;
                     GUILayout.Space(10);
 
                     GUILayout.Label("Available Editors:");
@@ -99,23 +121,17 @@ public class CoordinatorWindow : EditorWindow
                         events.ShowInFinder = GUILayout.Button("Open in Finder") ? editorInfo.Path : events.ShowInFinder;
                         GUILayout.EndHorizontal();
 
-
-                        // store the [scripting define symbols] in the project settings
-                        //      How do we do this per Editor in a non clunky way?
-                        // the additional editors are going to pull it from the project settings (which is symlinked by default)
-                        // pull current symbols and join it with the ones from project settings
-                        // then go into play (since this is the only time it matters)
-                        // then when exiting play remove them (since we don't want to permanently alter the project)
-
-
                         EditorGUI.BeginDisabledGroup(isRunningProject);
                         EditorGUILayout.LabelField("Command Line Params");
                         _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
                         EditorGUI.EndDisabledGroup();
-                        EditorGUILayout.LabelField("Scripting Define Symbols (Updates on editor before 'Play')");
-                        scriptingDefineSymbols[i] = EditorGUILayout.TextArea(scriptingDefineSymbols[i], GUILayout.Height(40), GUILayout.MaxWidth(200));
-                        EditorGUILayout.LabelField("On Play Params");
-                        _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
+
+                        if (m_Visible.HasCoordinatePlay) {
+                            EditorGUILayout.LabelField("OVERWRITE Scripting Define Symbols on Play (We will improve this in the future)");
+                            GUILayout.BeginHorizontal();
+                            m_Visible.Editors.scriptingDefineSymbols[i] = EditorGUILayout.TextArea(m_Visible.Editors.scriptingDefineSymbols[i], GUILayout.Height(40), GUILayout.MaxWidth(200));
+                            GUILayout.EndHorizontal();
+                        }
 
                         GUILayout.BeginHorizontal();
                         EditorGUI.BeginDisabledGroup(isRunningProject);
@@ -156,7 +172,6 @@ public class CoordinatorWindow : EditorWindow
             SettingsService.OpenProjectSettings(CoordinatorSettingsProvider.MenuLocationInProjectSettings);
         }
         if (events.UpdateCoordinatePlay) {
-            m_Visible.HasCoordinatePlay = !m_Visible.HasCoordinatePlay;
             EditorUserSettings.Coordinator_EditorCoordinatePlay = m_Visible.HasCoordinatePlay;
         }
         if (events.EditorAdd) {
@@ -186,7 +201,7 @@ public class CoordinatorWindow : EditorWindow
             var pathToProcessIds = m_Visible.PathToProcessIds;
             foreach (var p in pathToProcessIds) {
                 if (p.path == events.EditorClose) {
-                    Process.GetProcessById(p.processID).Kill(); // Is calling Kill twice bad? probably not so we don't need to update local memory
+                    Process.GetProcessById(p.processID).Kill(); // Is calling Kill() twice bad? Probably not so we don't need to update local memory
                     break;
                 }
             }
@@ -197,6 +212,15 @@ public class CoordinatorWindow : EditorWindow
         if (!string.IsNullOrWhiteSpace(events.ShowInFinder)) {
             UnityEngine.Debug.Assert(Directory.Exists(events.ShowInFinder), "Not a valid location");
             Process.Start(events.ShowInFinder);
+        }
+    }
+
+    private void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
+    {
+        if (playmodeState == PlayModeStateChange.ExitingEditMode) {
+            UnityEngine.Debug.Log("Saving scripting defines");
+            ProjectSettingsInMemory.scriptingDefineSymbols = m_Visible.Editors.scriptingDefineSymbols;
+            AssetDatabase.SaveAssetIfDirty(ProjectSettingsInMemory);
         }
     }
 }
