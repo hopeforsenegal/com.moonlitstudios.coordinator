@@ -131,7 +131,7 @@ public static class Editors
             EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Without being in a InitializeOnLoadMethod, the EnteredPlaymode event will get dropped in OriginalCoordinatePlaymodeStateChanged. We also cannot put that functionality in a EditorWindow/CoordinatorWindow
             EditorApplication.update += OriginalUpdate;
         } else {
-            UnityEngine.Debug.Log("Is Additional");
+            UnityEngine.Debug.Log($"Is Additional. Command Line [{Environment.CommandLine}]");
             SocketLayer.OpenListenerOnFile(MessageEndpoint.Playmode);
             SocketLayer.OpenListenerOnFile(MessageEndpoint.Scene);
             var args = Environment.GetCommandLineArgs();

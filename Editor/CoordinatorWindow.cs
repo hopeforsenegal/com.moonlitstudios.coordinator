@@ -19,16 +19,19 @@ public class CoordinatorWindow : EditorWindow
     public struct Visible
     {
         public Vector2 ScrollPosition;
+        public float RefreshInterval;
         public bool HasCoordinatePlay;
         public bool PreviousHasCoordinatePlay;
         public string[] ScriptingDefineSymbols;
         public string[] PreviousScriptingDefineSymbols;
-        public float RefreshInterval;
         public string[] EditorAvailable;
+        public string[] CommandLineParams;
+        public bool[] ShowFoldout;
         public PathToProcessId[] PathToProcessIds;
     }
     public struct Events
     {
+        public int Index;
         public bool EditorAdd;
         public string EditorOpen;
         public string EditorClose;
@@ -44,17 +47,32 @@ public class CoordinatorWindow : EditorWindow
 
     protected void CreateGUI()
     {
+        if (Editors.IsAdditional()) return;
+
         sVisible.HasCoordinatePlay = EditorUserSettings.Coordinator_EditorCoordinatePlay;
         sVisible.ScriptingDefineSymbols = new string[MaximumAmountOfEditors];
         sVisible.PreviousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
+        sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
+        sVisible.ShowFoldout = new bool[MaximumAmountOfEditors];
         sProjectSettingsInMemory = ProjectSettings.LoadInstance();
 
         var existingDefines = sProjectSettingsInMemory.scriptingDefineSymbols;
+        var existingCommandLineParams = sProjectSettingsInMemory.commandlineParams;
         for (int i = 0; i < MaximumAmountOfEditors && i < existingDefines.Length; i++) {
-            UnityEngine.Debug.Log($"Retrieving {existingDefines[i]} at {i}");
+            if (string.IsNullOrWhiteSpace(existingDefines[i])) continue;
+
+            UnityEngine.Debug.Log($"[{i}] Using scripting define '{existingDefines[i]}'");
             sVisible.ScriptingDefineSymbols[i] = existingDefines[i];
             sVisible.PreviousScriptingDefineSymbols[i] = existingDefines[i];
         }
+        for (int i = 0; i < MaximumAmountOfEditors && i < existingCommandLineParams.Length; i++) {
+            if (string.IsNullOrWhiteSpace(existingCommandLineParams[i])) continue;
+
+            UnityEngine.Debug.Log($"[{i}] Using command line param  '{existingCommandLineParams[i]}'");
+            sVisible.CommandLineParams[i] = existingCommandLineParams[i];
+        }
+        for (int i = 0; i < MaximumAmountOfEditors; i++) sVisible.ShowFoldout[i] = true;
+
         EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
     }
 
@@ -101,7 +119,7 @@ public class CoordinatorWindow : EditorWindow
                     sVisible.ScrollPosition = EditorGUILayout.BeginScrollView(sVisible.ScrollPosition);
 
                     for (int i = 0; i < sVisible.EditorAvailable.Length; i++) {
-                        string editor = sVisible.EditorAvailable[i];
+                        var editor = sVisible.EditorAvailable[i];
                         var editorInfo = EditorPaths.PopulateEditorInfo(editor);
                         var isRunningProject = false;
                         foreach (var p in sVisible.PathToProcessIds) {
@@ -111,42 +129,47 @@ public class CoordinatorWindow : EditorWindow
                             }
                         }
                         GUILayout.BeginVertical();
-                        EditorGUILayout.LabelField(editorInfo.Name);
 
-                        GUILayout.BeginHorizontal();
-                        EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
-                        events.ShowInFinder = GUILayout.Button("Open in Finder") ? editorInfo.Path : events.ShowInFinder;
-                        GUILayout.EndHorizontal();
-
-                        EditorGUI.BeginDisabledGroup(isRunningProject);
-                        EditorGUILayout.LabelField("Command Line Params");
-                        _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
-                        EditorGUI.EndDisabledGroup();
-
-                        if (sVisible.HasCoordinatePlay) {
-                            EditorGUILayout.LabelField("OVERWRITE Scripting Define Symbols on Play (We will improve this in the future)");
+                        events.Index = i;
+                        sVisible.ShowFoldout[i] = EditorGUILayout.Foldout(sVisible.ShowFoldout[i], editorInfo.Name);
+                        if (sVisible.ShowFoldout[i]) {
                             GUILayout.BeginHorizontal();
-                            sVisible.ScriptingDefineSymbols[i] = EditorGUILayout.TextArea(sVisible.ScriptingDefineSymbols[i], GUILayout.Height(40), GUILayout.MaxWidth(200));
+                            EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
+                            events.ShowInFinder = GUILayout.Button("Open in Finder") ? editorInfo.Path : events.ShowInFinder;
                             GUILayout.EndHorizontal();
-                        }
 
-                        GUILayout.BeginHorizontal();
-                        EditorGUI.BeginDisabledGroup(isRunningProject);
-                        events.EditorOpen = GUILayout.Button("Open Editor") ? editorInfo.Path : events.EditorOpen;
-                        EditorGUI.EndDisabledGroup();
-                        EditorGUI.BeginDisabledGroup(!isRunningProject);
-                        events.EditorClose = GUILayout.Button("Close Editor") ? editorInfo.Path : events.EditorClose;
-                        EditorGUI.EndDisabledGroup();
-                        GUILayout.EndHorizontal();
-                        if (GUILayout.Button("Delete Editor")) {
-                            events.EditorDelete = EditorUtility.DisplayDialog(
-                                "Delete this editor?",
-                                "Are you sure you want to delete this editor?",
-                                "Delete",
-                                "Cancel") ? editorInfo.Path : events.EditorDelete;
+                            if (i != 0) {
+                                EditorGUI.BeginDisabledGroup(isRunningProject);
+                                EditorGUILayout.LabelField("Command Line Params");
+                                sVisible.CommandLineParams[i] = EditorGUILayout.TextField(sVisible.CommandLineParams[i], EditorStyles.textField);
+                                EditorGUI.EndDisabledGroup();
+
+                                if (sVisible.HasCoordinatePlay) {
+                                    EditorGUILayout.LabelField("Scripting Define Symbols on Play [';' seperated] (Note: This Overwrites! We will improve this in the future)");
+                                    GUILayout.BeginHorizontal();
+                                    sVisible.ScriptingDefineSymbols[i] = EditorGUILayout.TextField(sVisible.ScriptingDefineSymbols[i], EditorStyles.textField);
+                                    GUILayout.EndHorizontal();
+                                }
+
+                                GUILayout.BeginHorizontal();
+                                EditorGUI.BeginDisabledGroup(isRunningProject);
+                                events.EditorOpen = GUILayout.Button("Open Editor") ? editorInfo.Path : events.EditorOpen;
+                                EditorGUI.EndDisabledGroup();
+                                EditorGUI.BeginDisabledGroup(!isRunningProject);
+                                events.EditorClose = GUILayout.Button("Close Editor") ? editorInfo.Path : events.EditorClose;
+                                EditorGUI.EndDisabledGroup();
+                                GUILayout.EndHorizontal();
+                                if (GUILayout.Button("Delete Editor")) {
+                                    events.EditorDelete = EditorUtility.DisplayDialog(
+                                        "Delete this editor?",
+                                        "Are you sure you want to delete this editor?",
+                                        "Delete",
+                                        "Cancel") ? editorInfo.Path : events.EditorDelete;
+                                }
+                            }
                         }
                         GUILayout.EndVertical();
-                        GUILayout.Space(50);
+                        GUILayout.Space(sVisible.ShowFoldout[i] ? 50 : 10);
                     }
 
                     EditorGUILayout.EndScrollView();
@@ -188,11 +211,12 @@ public class CoordinatorWindow : EditorWindow
         }
         if (!string.IsNullOrWhiteSpace(events.EditorOpen)) {
             UnityEngine.Debug.Assert(Directory.Exists(events.EditorOpen), "No Editor at location");
-            var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.AdditionalEditorParams}");
+            var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.AdditionalEditorParams} {sVisible.CommandLineParams[events.Index]}");
             var processIds = new List<PathToProcessId>(sVisible.PathToProcessIds);
             processIds.Add(new PathToProcessId { path = events.EditorOpen, processID = process.Id });
             UntilExitSettings.Coordinator_ProjectPathToChildProcessID = PathToProcessId.Join(processIds.ToArray());
             sVisible.PathToProcessIds = processIds.ToArray();
+            SaveProjectSettings();
         }
         if (!string.IsNullOrWhiteSpace(events.EditorClose)) {
             var pathToProcessIds = sVisible.PathToProcessIds;
@@ -212,12 +236,35 @@ public class CoordinatorWindow : EditorWindow
         }
     }
 
+    protected void OnLostFocus()
+    {
+        SaveProjectSettings();
+    }
+
     private void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
-        if (playmodeState == PlayModeStateChange.ExitingEditMode) {
-            UnityEngine.Debug.Log("Saving scripting defines");
-            sProjectSettingsInMemory.scriptingDefineSymbols = sVisible.ScriptingDefineSymbols;
-            AssetDatabase.SaveAssetIfDirty(sProjectSettingsInMemory);
+        if (playmodeState != PlayModeStateChange.ExitingEditMode) return;
+        SaveProjectSettings();
+    }
+
+    private static void SaveProjectSettings()
+    {
+        var scriptingDefineCounts = 0;
+        foreach (var item in sVisible.ScriptingDefineSymbols) {
+            if (!string.IsNullOrWhiteSpace(item)) {
+                scriptingDefineCounts++;
+            }
         }
+        var commandLineParamCounts = 0;
+        foreach (var item in sVisible.CommandLineParams) {
+            if (!string.IsNullOrWhiteSpace(item)) {
+                commandLineParamCounts++;
+            }
+        }
+        UnityEngine.Debug.Log($"Saving scripting {scriptingDefineCounts} define(s) and {commandLineParamCounts} command line param(s)");
+        sProjectSettingsInMemory.scriptingDefineSymbols = sVisible.ScriptingDefineSymbols;
+        sProjectSettingsInMemory.commandlineParams = sVisible.CommandLineParams;
+        EditorUtility.SetDirty(sProjectSettingsInMemory);
+        AssetDatabase.SaveAssetIfDirty(sProjectSettingsInMemory);
     }
 }
