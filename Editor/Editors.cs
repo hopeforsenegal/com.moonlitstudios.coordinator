@@ -8,7 +8,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public enum EditorType { Symlink, HardCopy }
+public enum EditorType { Symlink = 1, HardCopy }
 public static class CommandLineParams
 {
     public static string Additional { get; } = "--additional";
@@ -34,7 +34,6 @@ public static class Paths
 }
 public static class EditorUserSettings
 {
-    public static EditorType Coordinator_EditorTypeOnCreate { get => (EditorType)EditorPrefs.GetInt(nameof(Coordinator_EditorTypeOnCreate), (int)EditorType.Symlink); set => EditorPrefs.SetInt(nameof(Coordinator_EditorTypeOnCreate), (int)value); }
     public static bool Coordinator_EditorCoordinatePlay { get => EditorPrefs.GetInt(nameof(Coordinator_EditorCoordinatePlay), 0) == 1; set => EditorPrefs.SetInt(nameof(Coordinator_EditorCoordinatePlay), value ? 1 : 0); }
 }
 public static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
@@ -232,6 +231,30 @@ public static class Editors
     public static void Symlink(string sourcePath, string destinationPath)
     {
         ExecuteBashCommandLine($"ln -s {sourcePath.Replace(" ", "\\ ")} {destinationPath.Replace(" ", "\\ ")}");
+    }
+    public static void MarkAsSymlink(string destinationPath)
+    {
+        File.WriteAllText(Path.Combine(destinationPath, EditorType.Symlink.ToString()), "");
+    }
+    public static bool IsSymlinked(string destinationPath)
+    {
+        return File.Exists(Path.Combine(destinationPath, EditorType.Symlink.ToString()));
+    }
+
+    internal static void Hardcopy(string sourcePath, string destinationPath)
+    {
+        var dir = new DirectoryInfo(sourcePath);
+        var dirs = dir.GetDirectories();
+
+        Directory.CreateDirectory(destinationPath);
+
+        foreach (FileInfo file in dir.GetFiles()) {
+            file.CopyTo(Path.Combine(destinationPath, file.Name));
+        }
+
+        foreach (DirectoryInfo subDir in dirs) {
+            Hardcopy(subDir.FullName, Path.Combine(destinationPath, subDir.Name));
+        }
     }
 
     private static void ExecuteBashCommandLine(string command)

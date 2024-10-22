@@ -22,17 +22,19 @@ public class CoordinatorWindow : EditorWindow
         public float RefreshInterval;
         public bool HasCoordinatePlay;
         public bool PreviousHasCoordinatePlay;
+        // NOTE: We are Struct of arrays (instead of Array of structs). This is to ensure our compatibility of the string arrays across domains (ex. ProjectSettings)
         public string[] ScriptingDefineSymbols;
         public string[] PreviousScriptingDefineSymbols;
-        public string[] EditorAvailable;
         public string[] CommandLineParams;
-        public bool[] ShowFoldout;
+        public string[] Path;
+        public bool[] IsShowFoldout;
+        public bool[] IsSymlinked;
         public PathToProcessId[] PathToProcessIds;
     }
     public struct Events
     {
         public int Index;
-        public bool EditorAdd;
+        public EditorType EditorAdd;
         public string EditorOpen;
         public string EditorClose;
         public string EditorDelete;
@@ -53,7 +55,8 @@ public class CoordinatorWindow : EditorWindow
         sVisible.ScriptingDefineSymbols = new string[MaximumAmountOfEditors];
         sVisible.PreviousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
         sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
-        sVisible.ShowFoldout = new bool[MaximumAmountOfEditors];
+        sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
+        sVisible.IsSymlinked = new bool[MaximumAmountOfEditors];
         sProjectSettingsInMemory = ProjectSettings.LoadInstance();
 
         var existingDefines = sProjectSettingsInMemory.scriptingDefineSymbols;
@@ -71,7 +74,7 @@ public class CoordinatorWindow : EditorWindow
             UnityEngine.Debug.Log($"[{i}] Using command line param  '{existingCommandLineParams[i]}'");
             sVisible.CommandLineParams[i] = existingCommandLineParams[i];
         }
-        for (int i = 0; i < MaximumAmountOfEditors; i++) sVisible.ShowFoldout[i] = true;
+        for (int i = 0; i < MaximumAmountOfEditors; i++) sVisible.IsShowFoldout[i] = true;
 
         EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
     }
@@ -94,7 +97,11 @@ public class CoordinatorWindow : EditorWindow
             }
 
             sVisible.PathToProcessIds = updatedListOfProcesses.ToArray();
-            sVisible.EditorAvailable = Editors.GetEditorsAvailable();
+            sVisible.Path = Editors.GetEditorsAvailable();
+            for (int i = 0; i < sVisible.Path.Length; i++) {
+                string editor = sVisible.Path[i];
+                sVisible.IsSymlinked[i] = Editors.IsSymlinked(editor);
+            }
         }
 
         /*- UI -*/
@@ -107,7 +114,7 @@ public class CoordinatorWindow : EditorWindow
         if (Editors.IsAdditional()) {
             EditorGUILayout.HelpBox($"You can only launch additional editors from the original editor.", MessageType.Info);
         } else {
-            if (sVisible.EditorAvailable.Length >= 2) {
+            if (sVisible.Path.Length >= 2) {
                 GUILayout.BeginVertical();
                 {
                     GUILayout.Space(10);
@@ -118,8 +125,8 @@ public class CoordinatorWindow : EditorWindow
                     GUILayout.Label("Available Editors:");
                     sVisible.ScrollPosition = EditorGUILayout.BeginScrollView(sVisible.ScrollPosition);
 
-                    for (int i = 0; i < sVisible.EditorAvailable.Length; i++) {
-                        var editor = sVisible.EditorAvailable[i];
+                    for (int i = 0; i < sVisible.Path.Length; i++) {
+                        var editor = sVisible.Path[i];
                         var editorInfo = EditorPaths.PopulateEditorInfo(editor);
                         var isRunningProject = false;
                         foreach (var p in sVisible.PathToProcessIds) {
@@ -131,8 +138,10 @@ public class CoordinatorWindow : EditorWindow
                         GUILayout.BeginVertical();
 
                         events.Index = i;
-                        sVisible.ShowFoldout[i] = EditorGUILayout.Foldout(sVisible.ShowFoldout[i], editorInfo.Name);
-                        if (sVisible.ShowFoldout[i]) {
+                        sVisible.IsShowFoldout[i] = EditorGUILayout.Foldout(sVisible.IsShowFoldout[i], editorInfo.Name);
+                        if (sVisible.IsShowFoldout[i]) {
+                            var editorType = sVisible.IsSymlinked[i] ? EditorType.Symlink : EditorType.HardCopy;
+                            if (i != 0) EditorGUILayout.HelpBox($"{editorType}", MessageType.Info);
                             GUILayout.BeginHorizontal();
                             EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
                             events.ShowInFinder = GUILayout.Button("Open in Finder") ? editorInfo.Path : events.ShowInFinder;
@@ -151,6 +160,7 @@ public class CoordinatorWindow : EditorWindow
                                     GUILayout.EndHorizontal();
                                 }
 
+                                GUILayout.Space(10);
                                 GUILayout.BeginHorizontal();
                                 EditorGUI.BeginDisabledGroup(isRunningProject);
                                 events.EditorOpen = GUILayout.Button("Open Editor") ? editorInfo.Path : events.EditorOpen;
@@ -169,7 +179,7 @@ public class CoordinatorWindow : EditorWindow
                             }
                         }
                         GUILayout.EndVertical();
-                        GUILayout.Space(sVisible.ShowFoldout[i] ? 50 : 10);
+                        GUILayout.Space(10);
                     }
 
                     EditorGUILayout.EndScrollView();
@@ -179,7 +189,10 @@ public class CoordinatorWindow : EditorWindow
                 EditorGUILayout.HelpBox("Nothing to coordinate with. No additional editors are available yet.", MessageType.Info);
             }
 
-            events.EditorAdd = (sVisible.EditorAvailable.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorUserSettings.Coordinator_EditorTypeOnCreate} Editor");
+            GUILayout.BeginHorizontal();
+            events.EditorAdd = (sVisible.Path.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorType.Symlink} Editor") ? EditorType.Symlink : events.EditorAdd;
+            events.EditorAdd = (sVisible.Path.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorType.HardCopy} Editor") ? EditorType.HardCopy : events.EditorAdd;
+            GUILayout.EndHorizontal();
             EditorGUI.EndDisabledGroup();
             events.ShowInFinder = GUILayout.Button("Show Editors in Finder") ? Paths.ProjectRootPath : events.ShowInFinder;
         }
@@ -194,19 +207,20 @@ public class CoordinatorWindow : EditorWindow
         if (events.UpdateCoordinatePlay) {
             EditorUserSettings.Coordinator_EditorCoordinatePlay = sVisible.HasCoordinatePlay;
         }
-        if (events.EditorAdd) {
-            var path = Paths.ProjectPath;
-            var original = EditorPaths.PopulateEditorInfo(path);
-            var additional = EditorPaths.PopulateEditorInfo($"{path}Copy");
+        if (events.EditorAdd != default) {
+            var original = EditorPaths.PopulateEditorInfo(Paths.ProjectPath);
+            var additional = EditorPaths.PopulateEditorInfo($"{Paths.ProjectPath}Copy");
 
             Directory.CreateDirectory(additional.Path);
-            if (EditorUserSettings.Coordinator_EditorTypeOnCreate == EditorType.Symlink) {
+            if (events.EditorAdd == EditorType.Symlink) {
                 Editors.Symlink(original.Assets, additional.Assets);
                 Editors.Symlink(original.ProjectSettings, additional.ProjectSettings);
-                Editors.Symlink(original.Packages, additional.Packages); // There is a world where you want different packages on your  In that case this part should be controlled by a setting. Defaulting to symlink for now though
-                // -- TODO mark that this is a symlink project and not a copy... so that the UI can show it!
+                Editors.Symlink(original.Packages, additional.Packages);
+                Editors.MarkAsSymlink(additional.Path);
             } else {
-                UnityEngine.Debug.Assert(false, "TODO !");
+                Editors.Hardcopy(original.Assets, additional.Assets);
+                Editors.Hardcopy(original.ProjectSettings, additional.ProjectSettings);
+                Editors.Hardcopy(original.Packages, additional.Packages);
             }
         }
         if (!string.IsNullOrWhiteSpace(events.EditorOpen)) {
