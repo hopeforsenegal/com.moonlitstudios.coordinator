@@ -15,20 +15,17 @@ public class CoordinatorWindow : EditorWindow
     [MenuItem("Moonlit/Coordinator/Coordinate", priority = 20)]
     public static void ShowWindow() => GetWindow(typeof(CoordinatorWindow));
 
-    public struct EditorsVisible
-    {
-        public Vector2 ScrollPosition;
-        public string[] scriptingDefineSymbols;
-        public string[] previousScriptingDefineSymbols;
-    }
+    public const int MaximumAmountOfEditors = 6;
     public struct Visible
     {
+        public Vector2 ScrollPosition;
         public bool HasCoordinatePlay;
         public bool PreviousHasCoordinatePlay;
-        public EditorsVisible Editors;
+        public string[] ScriptingDefineSymbols;
+        public string[] PreviousScriptingDefineSymbols;
         public float RefreshInterval;
         public string[] EditorAvailable;
-        internal PathToProcessId[] PathToProcessIds;
+        public PathToProcessId[] PathToProcessIds;
     }
     public struct Events
     {
@@ -42,21 +39,21 @@ public class CoordinatorWindow : EditorWindow
         public bool Github;
     }
 
-    private Visible m_Visible;
-    public const int MaximumAmountOfEditors = 6;
-    public static ProjectSettings ProjectSettingsInMemory;
+    private static Visible sVisible;
+    private static ProjectSettings sProjectSettingsInMemory;
 
     protected void CreateGUI()
     {
-        m_Visible.HasCoordinatePlay = EditorUserSettings.Coordinator_EditorCoordinatePlay;
-        m_Visible.Editors.scriptingDefineSymbols = new string[MaximumAmountOfEditors];
-        m_Visible.Editors.previousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
-        ProjectSettingsInMemory = ProjectSettings.LoadInstance();
-        var existingDefines = ProjectSettingsInMemory.scriptingDefineSymbols;
+        sVisible.HasCoordinatePlay = EditorUserSettings.Coordinator_EditorCoordinatePlay;
+        sVisible.ScriptingDefineSymbols = new string[MaximumAmountOfEditors];
+        sVisible.PreviousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
+        sProjectSettingsInMemory = ProjectSettings.LoadInstance();
+
+        var existingDefines = sProjectSettingsInMemory.scriptingDefineSymbols;
         for (int i = 0; i < MaximumAmountOfEditors && i < existingDefines.Length; i++) {
-            UnityEngine.Debug.Log($"Retrieving {existingDefines[i]}");
-            m_Visible.Editors.scriptingDefineSymbols[i] = existingDefines[i];
-            m_Visible.Editors.previousScriptingDefineSymbols[i] = existingDefines[i];
+            UnityEngine.Debug.Log($"Retrieving {existingDefines[i]} at {i}");
+            sVisible.ScriptingDefineSymbols[i] = existingDefines[i];
+            sVisible.PreviousScriptingDefineSymbols[i] = existingDefines[i];
         }
         EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
     }
@@ -65,10 +62,10 @@ public class CoordinatorWindow : EditorWindow
     {
         var events = new Events();
 
-        if (m_Visible.RefreshInterval > 0) {
-            m_Visible.RefreshInterval -= Time.deltaTime;
+        if (sVisible.RefreshInterval > 0) {
+            sVisible.RefreshInterval -= Time.deltaTime;
         } else {
-            m_Visible.RefreshInterval = .5f; // Refresh every half second
+            sVisible.RefreshInterval = .5f; // Refresh every half second
             ////////////////////////
             var pathToProcessIds = PathToProcessId.Split(UntilExitSettings.Coordinator_ProjectPathToChildProcessID);
             var updatedListOfProcesses = new List<PathToProcessId>();
@@ -78,11 +75,11 @@ public class CoordinatorWindow : EditorWindow
                 }
             }
 
-            m_Visible.PathToProcessIds = updatedListOfProcesses.ToArray();
-            m_Visible.EditorAvailable = Editors.GetEditorsAvailable();
+            sVisible.PathToProcessIds = updatedListOfProcesses.ToArray();
+            sVisible.EditorAvailable = Editors.GetEditorsAvailable();
         }
 
-        /*- Render -*/
+        /*- UI -*/
         GUILayout.BeginHorizontal();
         events.Settings = GUILayout.Button("Settings");
         events.Github = GUILayout.Button("Github");
@@ -92,22 +89,22 @@ public class CoordinatorWindow : EditorWindow
         if (Editors.IsAdditional()) {
             EditorGUILayout.HelpBox($"You can only launch additional editors from the original editor.", MessageType.Info);
         } else {
-            if (m_Visible.EditorAvailable.Length >= 2) {
+            if (sVisible.EditorAvailable.Length >= 2) {
                 GUILayout.BeginVertical();
                 {
                     GUILayout.Space(10);
-                    m_Visible.HasCoordinatePlay = GUILayout.Toggle(m_Visible.HasCoordinatePlay, "Coordinate Play Mode");
-                    events.UpdateCoordinatePlay = m_Visible.HasCoordinatePlay != m_Visible.PreviousHasCoordinatePlay;
+                    sVisible.HasCoordinatePlay = GUILayout.Toggle(sVisible.HasCoordinatePlay, "Coordinate Play Mode");
+                    events.UpdateCoordinatePlay = sVisible.HasCoordinatePlay != sVisible.PreviousHasCoordinatePlay;
                     GUILayout.Space(10);
 
                     GUILayout.Label("Available Editors:");
-                    m_Visible.Editors.ScrollPosition = EditorGUILayout.BeginScrollView(m_Visible.Editors.ScrollPosition);
+                    sVisible.ScrollPosition = EditorGUILayout.BeginScrollView(sVisible.ScrollPosition);
 
-                    for (int i = 0; i < m_Visible.EditorAvailable.Length; i++) {
-                        string editor = m_Visible.EditorAvailable[i];
+                    for (int i = 0; i < sVisible.EditorAvailable.Length; i++) {
+                        string editor = sVisible.EditorAvailable[i];
                         var editorInfo = EditorPaths.PopulateEditorInfo(editor);
                         var isRunningProject = false;
-                        foreach (var p in m_Visible.PathToProcessIds) {
+                        foreach (var p in sVisible.PathToProcessIds) {
                             if (p.path == editorInfo.Path) {
                                 isRunningProject = true;
                                 break;
@@ -126,10 +123,10 @@ public class CoordinatorWindow : EditorWindow
                         _ = EditorGUILayout.TextArea("temp", GUILayout.Height(40), GUILayout.MaxWidth(200));
                         EditorGUI.EndDisabledGroup();
 
-                        if (m_Visible.HasCoordinatePlay) {
+                        if (sVisible.HasCoordinatePlay) {
                             EditorGUILayout.LabelField("OVERWRITE Scripting Define Symbols on Play (We will improve this in the future)");
                             GUILayout.BeginHorizontal();
-                            m_Visible.Editors.scriptingDefineSymbols[i] = EditorGUILayout.TextArea(m_Visible.Editors.scriptingDefineSymbols[i], GUILayout.Height(40), GUILayout.MaxWidth(200));
+                            sVisible.ScriptingDefineSymbols[i] = EditorGUILayout.TextArea(sVisible.ScriptingDefineSymbols[i], GUILayout.Height(40), GUILayout.MaxWidth(200));
                             GUILayout.EndHorizontal();
                         }
 
@@ -159,12 +156,12 @@ public class CoordinatorWindow : EditorWindow
                 EditorGUILayout.HelpBox("Nothing to coordinate with. No additional editors are available yet.", MessageType.Info);
             }
 
-            events.EditorAdd = (m_Visible.EditorAvailable.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorUserSettings.Coordinator_EditorTypeOnCreate} Editor");
+            events.EditorAdd = (sVisible.EditorAvailable.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorUserSettings.Coordinator_EditorTypeOnCreate} Editor");
             EditorGUI.EndDisabledGroup();
             events.ShowInFinder = GUILayout.Button("Show Editors in Finder") ? Paths.ProjectRootPath : events.ShowInFinder;
         }
 
-        /*- Events -*/
+        /*- Handle Events -*/
         if (events.Github) {
             Application.OpenURL("https://github.com/hopeforsenegal/com.moonlitstudios.coordinator");
         }
@@ -172,7 +169,7 @@ public class CoordinatorWindow : EditorWindow
             SettingsService.OpenProjectSettings(CoordinatorSettingsProvider.MenuLocationInProjectSettings);
         }
         if (events.UpdateCoordinatePlay) {
-            EditorUserSettings.Coordinator_EditorCoordinatePlay = m_Visible.HasCoordinatePlay;
+            EditorUserSettings.Coordinator_EditorCoordinatePlay = sVisible.HasCoordinatePlay;
         }
         if (events.EditorAdd) {
             var path = Paths.ProjectPath;
@@ -183,7 +180,7 @@ public class CoordinatorWindow : EditorWindow
             if (EditorUserSettings.Coordinator_EditorTypeOnCreate == EditorType.Symlink) {
                 Editors.Symlink(original.Assets, additional.Assets);
                 Editors.Symlink(original.ProjectSettings, additional.ProjectSettings);
-                Editors.Symlink(original.Packages, additional.Packages); // There is a world where you want different packages on your editors. In that case this part should be controlled by a setting. Defaulting to symlink for now though
+                Editors.Symlink(original.Packages, additional.Packages); // There is a world where you want different packages on your  In that case this part should be controlled by a setting. Defaulting to symlink for now though
                 // -- TODO mark that this is a symlink project and not a copy... so that the UI can show it!
             } else {
                 UnityEngine.Debug.Assert(false, "TODO !");
@@ -192,13 +189,13 @@ public class CoordinatorWindow : EditorWindow
         if (!string.IsNullOrWhiteSpace(events.EditorOpen)) {
             UnityEngine.Debug.Assert(Directory.Exists(events.EditorOpen), "No Editor at location");
             var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.AdditionalEditorParams}");
-            var processIds = new List<PathToProcessId>(m_Visible.PathToProcessIds);
+            var processIds = new List<PathToProcessId>(sVisible.PathToProcessIds);
             processIds.Add(new PathToProcessId { path = events.EditorOpen, processID = process.Id });
             UntilExitSettings.Coordinator_ProjectPathToChildProcessID = PathToProcessId.Join(processIds.ToArray());
-            m_Visible.PathToProcessIds = processIds.ToArray();
+            sVisible.PathToProcessIds = processIds.ToArray();
         }
         if (!string.IsNullOrWhiteSpace(events.EditorClose)) {
-            var pathToProcessIds = m_Visible.PathToProcessIds;
+            var pathToProcessIds = sVisible.PathToProcessIds;
             foreach (var p in pathToProcessIds) {
                 if (p.path == events.EditorClose) {
                     Process.GetProcessById(p.processID).Kill(); // Is calling Kill() twice bad? Probably not so we don't need to update local memory
@@ -219,8 +216,8 @@ public class CoordinatorWindow : EditorWindow
     {
         if (playmodeState == PlayModeStateChange.ExitingEditMode) {
             UnityEngine.Debug.Log("Saving scripting defines");
-            ProjectSettingsInMemory.scriptingDefineSymbols = m_Visible.Editors.scriptingDefineSymbols;
-            AssetDatabase.SaveAssetIfDirty(ProjectSettingsInMemory);
+            sProjectSettingsInMemory.scriptingDefineSymbols = sVisible.ScriptingDefineSymbols;
+            AssetDatabase.SaveAssetIfDirty(sProjectSettingsInMemory);
         }
     }
 }

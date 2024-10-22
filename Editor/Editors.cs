@@ -42,6 +42,24 @@ public static class UntilExitSettings // SessionState is cleared when Unity exit
     public static string Coordinator_ParentProcessID { get => SessionState.GetString(nameof(Coordinator_ParentProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ParentProcessID), value); }
     public static string Coordinator_ProjectPathToChildProcessID { get => SessionState.GetString(nameof(Coordinator_ProjectPathToChildProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ProjectPathToChildProcessID), value); }
 }
+public class SessionStateConvenientListInt
+{
+    private readonly string m_Key;
+
+    public SessionStateConvenientListInt(string key) => m_Key = key;
+    public int[] Get() => SessionState.GetIntArray(m_Key, new int[] { });
+    public void Clear() => SessionState.EraseIntArray(m_Key);
+    public int Count() => Get().Length;
+
+    public void Queue(int value) => SessionState.SetIntArray(m_Key, new List<int>(SessionState.GetIntArray(m_Key, new int[] { })) { value }.ToArray());// @value add
+    public int Dequeue()
+    {
+        int[] array = Get();
+        Clear();
+        for (int i = 1; i < array.Length - 1; i++) Queue(array[i]);
+        return array[0];
+    }
+}
 public struct PathToProcessId
 {   // Format is 'long/project/path|1234124' and we store all of them seperated by ;
     public string path;
