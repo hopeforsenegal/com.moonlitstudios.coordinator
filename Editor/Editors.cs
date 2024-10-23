@@ -34,12 +34,13 @@ public static class Paths
 }
 public static class EditorUserSettings
 {
-    public static bool Coordinator_EditorCoordinatePlay { get => EditorPrefs.GetInt(nameof(Coordinator_EditorCoordinatePlay), 0) == 1; set => EditorPrefs.SetInt(nameof(Coordinator_EditorCoordinatePlay), value ? 1 : 0); }
+    public static bool Coordinator_IsCoordinatePlaySettingOnOriginal { get => EditorPrefs.GetInt(nameof(Coordinator_IsCoordinatePlaySettingOnOriginal), 0) == 1; set => EditorPrefs.SetInt(nameof(Coordinator_IsCoordinatePlaySettingOnOriginal), value ? 1 : 0); }
 }
 public static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
 {
     public static string Coordinator_ParentProcessID { get => SessionState.GetString(nameof(Coordinator_ParentProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ParentProcessID), value); }
     public static string Coordinator_ProjectPathToChildProcessID { get => SessionState.GetString(nameof(Coordinator_ProjectPathToChildProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ProjectPathToChildProcessID), value); }
+    public static bool Coordinator_IsCoordinatePlayThisSessionOnAdditional { get => SessionState.GetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), value ? 1 : 0); }
 }
 public class SessionStateConvenientListInt
 {
@@ -111,14 +112,14 @@ public struct EditorPaths
     }
 }
 
+[InitializeOnLoad] // Without being in a InitializeOnLoad, the EnteredPlaymode event will get dropped in OriginalCoordinatePlaymodeStateChanged. We also cannot put that functionality in a EditorWindow/CoordinatorWindow
 public static class Editors
 {
     private static float RefreshInterval;
     private static readonly List<string> EndPointsToProcess = new List<string>();
     private static readonly SessionStateConvenientListInt Playmode = new SessionStateConvenientListInt(nameof(Playmode));
 
-    [InitializeOnLoadMethod]
-    public static void OnInitialize()
+    static Editors()
     {
         if (!IsAdditional()) {
             UnityEngine.Debug.Log("Is Original");
@@ -127,7 +128,7 @@ public static class Editors
                 UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(EditorSceneManager.GetActiveScene().name));
                 SocketLayer.WriteMessage(MessageEndpoint.Scene, path);
             }
-            EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Without being in a InitializeOnLoadMethod, the EnteredPlaymode event will get dropped in OriginalCoordinatePlaymodeStateChanged. We also cannot put that functionality in a EditorWindow/CoordinatorWindow
+            EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged;
             EditorApplication.update += OriginalUpdate;
         } else {
             UnityEngine.Debug.Log($"Is Additional. Command Line [{Environment.CommandLine}]");
@@ -140,33 +141,40 @@ public static class Editors
                     UntilExitSettings.Coordinator_ParentProcessID = args[i + 1];
                 }
             }
+            EditorApplication.playModeStateChanged += AdditionalCoordinatePlaymodeStateChanged;
             EditorApplication.update += AdditionalUpdate;
-        }
-    }
-
-    private static void OriginalUpdate()
-    {
-        if (RefreshInterval > 0) {
-            RefreshInterval -= Time.deltaTime;
-        } else {
-            RefreshInterval = .5f; // Refresh every half second
-            ////////////////////////
-
-            if (Playmode.Count() > 0) {
-                var playmode = (PlayModeStateChange)Playmode.Dequeue();
-                UnityEngine.Debug.Log($"Writing command '{playmode}'");
-                switch (playmode) {
-                    case PlayModeStateChange.EnteredPlayMode: SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Play(ProjectSettings.LoadInstance().scriptingDefineSymbols)); break;
-                    case PlayModeStateChange.EnteredEditMode: SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Edit); break;
-                }
-            }
         }
     }
 
     private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
-        if (playmodeState == PlayModeStateChange.EnteredPlayMode || playmodeState == PlayModeStateChange.EnteredEditMode) {
-            Playmode.Queue((int)playmodeState);
+        if (!EditorUserSettings.Coordinator_IsCoordinatePlaySettingOnOriginal) return;
+        if (playmodeState == PlayModeStateChange.ExitingPlayMode) return;
+        if (playmodeState == PlayModeStateChange.ExitingEditMode) return;
+        Playmode.Queue((int)playmodeState); // We queue these for later because domain reloads
+    }
+
+    private static void AdditionalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
+    {
+        if (playmodeState == PlayModeStateChange.ExitingPlayMode && UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional) {
+            var ok = EditorUtility.DisplayDialog("Coordinated Playmode", "This was a coordinated Play mode session. Please exit playmode from the Original Editor.", "OK", "Exit Playmode");
+            if (ok) {
+                EditorApplication.isPlaying = true;
+            } else {
+                UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false;
+            }
+        }
+    }
+
+    private static void OriginalUpdate()
+    {
+        if (Playmode.Count() > 0) {
+            var playmode = (PlayModeStateChange)Playmode.Dequeue();
+            UnityEngine.Debug.Log($"Writing command '{playmode}'");
+            switch (playmode) {
+                case PlayModeStateChange.EnteredPlayMode: SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Play(ProjectSettings.LoadInstance().scriptingDefineSymbols)); break;
+                case PlayModeStateChange.EnteredEditMode: SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Edit); break;
+            }
         }
     }
 
@@ -199,8 +207,8 @@ public static class Editors
                     }
 
                     switch (split[0]) {
-                        case nameof(Messages.Play): EditorApplication.isPlaying = true; break;
-                        case nameof(Messages.Edit): EditorApplication.isPlaying = false; break;
+                        case nameof(Messages.Play): UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true; EditorApplication.isPlaying = true; break;
+                        case nameof(Messages.Edit): UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false; EditorApplication.isPlaying = false; break;
                     }
                 }
                 if (endpoint == MessageEndpoint.Scene) {

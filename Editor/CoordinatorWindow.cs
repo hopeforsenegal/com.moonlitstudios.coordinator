@@ -21,7 +21,6 @@ public class CoordinatorWindow : EditorWindow
         public Vector2 ScrollPosition;
         public float RefreshInterval;
         public bool HasCoordinatePlay;
-        public bool PreviousHasCoordinatePlay;
         // NOTE: We are Struct of arrays (instead of Array of structs). This is to ensure our compatibility of the string arrays across domains (ex. ProjectSettings)
         public string[] ScriptingDefineSymbols;
         public string[] PreviousScriptingDefineSymbols;
@@ -51,12 +50,7 @@ public class CoordinatorWindow : EditorWindow
     {
         if (Editors.IsAdditional()) return;
 
-        sVisible.HasCoordinatePlay = EditorUserSettings.Coordinator_EditorCoordinatePlay;
-        sVisible.ScriptingDefineSymbols = new string[MaximumAmountOfEditors];
-        sVisible.PreviousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
-        sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
-        sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
-        sVisible.IsSymlinked = new bool[MaximumAmountOfEditors];
+        InitializeVisibleMemory();
         sProjectSettingsInMemory = ProjectSettings.LoadInstance();
 
         var existingDefines = sProjectSettingsInMemory.scriptingDefineSymbols;
@@ -79,6 +73,16 @@ public class CoordinatorWindow : EditorWindow
         EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
     }
 
+    private static void InitializeVisibleMemory()
+    {
+        sVisible.HasCoordinatePlay = EditorUserSettings.Coordinator_IsCoordinatePlaySettingOnOriginal;
+        sVisible.ScriptingDefineSymbols = new string[MaximumAmountOfEditors];
+        sVisible.PreviousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
+        sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
+        sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
+        sVisible.IsSymlinked = new bool[MaximumAmountOfEditors];
+    }
+
     protected void OnGUI()
     {
         var events = new Events();
@@ -98,9 +102,12 @@ public class CoordinatorWindow : EditorWindow
 
             sVisible.PathToProcessIds = updatedListOfProcesses.ToArray();
             sVisible.Path = Editors.GetEditorsAvailable();
+
+            if (sVisible.IsSymlinked == null) {
+                InitializeVisibleMemory();
+            }
             for (int i = 0; i < sVisible.Path.Length; i++) {
-                string editor = sVisible.Path[i];
-                sVisible.IsSymlinked[i] = Editors.IsSymlinked(editor);
+                sVisible.IsSymlinked[i] = Editors.IsSymlinked(sVisible.Path[i]);
             }
         }
 
@@ -114,12 +121,12 @@ public class CoordinatorWindow : EditorWindow
         if (Editors.IsAdditional()) {
             EditorGUILayout.HelpBox($"You can only launch additional editors from the original editor.", MessageType.Info);
         } else {
-            if (sVisible.Path.Length >= 2) {
+            if (sVisible.Path != null && sVisible.Path.Length >= 2) {
                 GUILayout.BeginVertical();
                 {
                     GUILayout.Space(10);
-                    sVisible.HasCoordinatePlay = GUILayout.Toggle(sVisible.HasCoordinatePlay, "Coordinate Play Mode");
-                    events.UpdateCoordinatePlay = sVisible.HasCoordinatePlay != sVisible.PreviousHasCoordinatePlay;
+                    var hasCoordinatePlay = GUILayout.Toggle(sVisible.HasCoordinatePlay, "Coordinate Play Mode");
+                    events.UpdateCoordinatePlay = sVisible.HasCoordinatePlay != hasCoordinatePlay;
                     GUILayout.Space(10);
 
                     GUILayout.Label("Available Editors:");
@@ -205,7 +212,8 @@ public class CoordinatorWindow : EditorWindow
             SettingsService.OpenProjectSettings(CoordinatorSettingsProvider.MenuLocationInProjectSettings);
         }
         if (events.UpdateCoordinatePlay) {
-            EditorUserSettings.Coordinator_EditorCoordinatePlay = sVisible.HasCoordinatePlay;
+            sVisible.HasCoordinatePlay = !sVisible.HasCoordinatePlay;
+            EditorUserSettings.Coordinator_IsCoordinatePlaySettingOnOriginal = sVisible.HasCoordinatePlay;
         }
         if (events.EditorAdd != default) {
             var original = EditorPaths.PopulateEditorInfo(Paths.ProjectPath);
