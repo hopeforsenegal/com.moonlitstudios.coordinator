@@ -271,6 +271,8 @@ public class CoordinatorWindow : EditorWindow
 
     private static void SaveProjectSettings()
     {
+        if (sVisible.ScriptingDefineSymbols == null) return;
+
         var scriptingDefineCounts = 0;
         foreach (var item in sVisible.ScriptingDefineSymbols) {
             if (!string.IsNullOrWhiteSpace(item)) {
