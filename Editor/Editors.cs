@@ -206,6 +206,14 @@ public static class Editors
                         AssetDatabase.Refresh();
                     }
 
+                    EditorApplication.delayCall += () =>
+                    {
+                        var sceneView = SceneView.lastActiveSceneView;
+                        if (sceneView == null) sceneView = SceneView.CreateWindow<SceneView>();
+
+                        sceneView.Show();
+                        sceneView.Focus();
+                    };
                     switch (split[0]) {
                         case nameof(Messages.Play): UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true; EditorApplication.isPlaying = true; break;
                         case nameof(Messages.Edit): UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false; EditorApplication.isPlaying = false; break;

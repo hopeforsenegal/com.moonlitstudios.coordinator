@@ -260,6 +260,7 @@ public class CoordinatorWindow : EditorWindow
 
     protected void OnLostFocus()
     {
+        if (Editors.IsAdditional()) return;
         SaveProjectSettings();
     }
 
