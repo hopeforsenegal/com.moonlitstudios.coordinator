@@ -9,6 +9,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public enum EditorType { Symlink = 1, HardCopy }
+public enum CoordinationModes { Standalone, Playmode, TestAndPlaymode }
 public static class CommandLineParams
 {
     public static string Additional { get; } = "--additional";
@@ -34,7 +35,7 @@ public static class Paths
 }
 public static class EditorUserSettings
 {
-    public static bool Coordinator_IsCoordinatePlaySettingOnOriginal { get => EditorPrefs.GetInt(nameof(Coordinator_IsCoordinatePlaySettingOnOriginal), 0) == 1; set => EditorPrefs.SetInt(nameof(Coordinator_IsCoordinatePlaySettingOnOriginal), value ? 1 : 0); }
+    public static int Coordinator_CoordinatePlaySettingOnOriginal { get => EditorPrefs.GetInt(nameof(Coordinator_CoordinatePlaySettingOnOriginal), 0); set => EditorPrefs.SetInt(nameof(Coordinator_CoordinatePlaySettingOnOriginal), value); }
 }
 public static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
 {
@@ -148,7 +149,7 @@ public static class Editors
 
     private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
-        if (!EditorUserSettings.Coordinator_IsCoordinatePlaySettingOnOriginal) return;
+        if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == (int)CoordinationModes.Standalone) return;
         if (playmodeState == PlayModeStateChange.ExitingPlayMode) return;
         if (playmodeState == PlayModeStateChange.ExitingEditMode) return;
         Playmode.Queue((int)playmodeState); // We queue these for later because domain reloads

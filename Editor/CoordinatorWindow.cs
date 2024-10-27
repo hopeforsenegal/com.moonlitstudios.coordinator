@@ -20,7 +20,7 @@ public class CoordinatorWindow : EditorWindow
     {
         public Vector2 ScrollPosition;
         public float RefreshInterval;
-        public bool HasCoordinatePlay;
+        public CoordinationModes CoordinationMode;
         // NOTE: We are Struct of arrays (instead of Array of structs). This is to ensure our compatibility of the string arrays across domains (ex. ProjectSettings)
         public string[] ScriptingDefineSymbols;
         public string[] PreviousScriptingDefineSymbols;
@@ -45,6 +45,8 @@ public class CoordinatorWindow : EditorWindow
 
     private static Visible sVisible;
     private static ProjectSettings sProjectSettingsInMemory;
+    private static int selectedOption, previousSelection = 0;
+    private static readonly string[] options = { CoordinationModes.Standalone.ToString(), CoordinationModes.Playmode.ToString(), CoordinationModes.TestAndPlaymode.ToString() };
 
     protected void CreateGUI()
     {
@@ -75,7 +77,7 @@ public class CoordinatorWindow : EditorWindow
 
     private static void InitializeVisibleMemory()
     {
-        sVisible.HasCoordinatePlay = EditorUserSettings.Coordinator_IsCoordinatePlaySettingOnOriginal;
+        sVisible.CoordinationMode = (CoordinationModes)EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
         sVisible.ScriptingDefineSymbols = new string[MaximumAmountOfEditors];
         sVisible.PreviousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
         sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
@@ -86,6 +88,7 @@ public class CoordinatorWindow : EditorWindow
     protected void OnGUI()
     {
         var events = new Events();
+        previousSelection = selectedOption;
 
         if (sVisible.RefreshInterval > 0) {
             sVisible.RefreshInterval -= Time.deltaTime;
@@ -125,8 +128,9 @@ public class CoordinatorWindow : EditorWindow
                 GUILayout.BeginVertical();
                 {
                     GUILayout.Space(10);
-                    var hasCoordinatePlay = GUILayout.Toggle(sVisible.HasCoordinatePlay, "Coordinate Play Mode");
-                    events.UpdateCoordinatePlay = sVisible.HasCoordinatePlay != hasCoordinatePlay;
+                    GUILayout.Label("Coordination Mode:");
+                    selectedOption = GUILayout.SelectionGrid(selectedOption, options, options.Length);
+                    if (selectedOption != previousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(10);
 
                     GUILayout.Label("Available Editors:");
@@ -160,7 +164,7 @@ public class CoordinatorWindow : EditorWindow
                                 sVisible.CommandLineParams[i] = EditorGUILayout.TextField(sVisible.CommandLineParams[i], EditorStyles.textField);
                                 EditorGUI.EndDisabledGroup();
 
-                                if (sVisible.HasCoordinatePlay) {
+                                if (sVisible.CoordinationMode != CoordinationModes.Standalone) {
                                     EditorGUILayout.LabelField("Scripting Define Symbols on Play [';' seperated] (Note: This Overwrites! We will improve this in the future)");
                                     GUILayout.BeginHorizontal();
                                     sVisible.ScriptingDefineSymbols[i] = EditorGUILayout.TextField(sVisible.ScriptingDefineSymbols[i], EditorStyles.textField);
@@ -212,8 +216,8 @@ public class CoordinatorWindow : EditorWindow
             SettingsService.OpenProjectSettings(CoordinatorSettingsProvider.MenuLocationInProjectSettings);
         }
         if (events.UpdateCoordinatePlay) {
-            sVisible.HasCoordinatePlay = !sVisible.HasCoordinatePlay;
-            EditorUserSettings.Coordinator_IsCoordinatePlaySettingOnOriginal = sVisible.HasCoordinatePlay;
+            sVisible.CoordinationMode = (CoordinationModes)selectedOption;
+            EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = selectedOption;
         }
         if (events.EditorAdd != default) {
             var original = EditorPaths.PopulateEditorInfo(Paths.ProjectPath);
