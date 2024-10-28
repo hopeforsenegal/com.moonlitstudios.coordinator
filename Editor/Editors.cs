@@ -10,6 +10,7 @@ using UnityEngine.SceneManagement;
 
 public enum EditorType { Symlink = 1, HardCopy }
 public enum CoordinationModes { Standalone, Playmode, TestAndPlaymode }
+public enum TestStates { Idle, Running, PostTest }
 public static class CommandLineParams
 {
     public static string Additional { get; } = "--additional";
@@ -39,6 +40,7 @@ public static class EditorUserSettings
 }
 public static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
 {
+    public static int Coordinator_TestState { get => SessionState.GetInt(nameof(Coordinator_TestState), 0); set => SessionState.SetInt(nameof(Coordinator_TestState), value); }
     public static string Coordinator_ParentProcessID { get => SessionState.GetString(nameof(Coordinator_ParentProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ParentProcessID), value); }
     public static string Coordinator_ProjectPathToChildProcessID { get => SessionState.GetString(nameof(Coordinator_ProjectPathToChildProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ProjectPathToChildProcessID), value); }
     public static bool Coordinator_IsCoordinatePlayThisSessionOnAdditional { get => SessionState.GetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), value ? 1 : 0); }
@@ -202,7 +204,7 @@ public static class Editors
                 if (endpoint == MessageEndpoint.Playmode) {
                     var split = message.Split("|");
                     if (split.Length == 2) {
-                        UnityEngine.Debug.Log($"Doing asset database refresh. Updating Scripting Defines '{split[1]}'");
+                        UnityEngine.Debug.Log($"Updating Scripting Defines '{split[1]}'. Then doing asset database refresh.");
                         PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone), split[1]);
                         AssetDatabase.Refresh();
                     }
@@ -210,7 +212,7 @@ public static class Editors
                     EditorApplication.delayCall += () =>
                     {
                         var sceneView = SceneView.lastActiveSceneView;
-                        if (sceneView == null) sceneView = SceneView.CreateWindow<SceneView>();
+                        if (sceneView == null) sceneView = EditorWindow.CreateWindow<SceneView>();
 
                         sceneView.Show();
                         sceneView.Focus();

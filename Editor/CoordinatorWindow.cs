@@ -41,6 +41,8 @@ public class CoordinatorWindow : EditorWindow
         public bool UpdateCoordinatePlay;
         public bool Settings;
         public bool Github;
+        internal bool StartTests;
+        internal bool StopTests;
     }
 
     private static Visible sVisible;
@@ -83,6 +85,7 @@ public class CoordinatorWindow : EditorWindow
         sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
         sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
         sVisible.IsSymlinked = new bool[MaximumAmountOfEditors];
+        selectedOption = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
     }
 
     protected void OnGUI()
@@ -132,6 +135,26 @@ public class CoordinatorWindow : EditorWindow
                     selectedOption = GUILayout.SelectionGrid(selectedOption, options, options.Length);
                     if (selectedOption != previousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(10);
+
+                    if (sVisible.CoordinationMode == CoordinationModes.TestAndPlaymode) {
+                        var testState = (TestStates)UntilExitSettings.Coordinator_TestState;
+                        GUILayout.BeginHorizontal();
+                        GUILayout.BeginVertical();
+                        EditorGUILayout.LabelField($"Status:");
+                        EditorGUILayout.HelpBox($"{testState}", MessageType.None);
+                        GUILayout.EndVertical();
+                        if (testState == TestStates.Idle) {
+                            GUI.color = Color.green;
+                            events.StartTests = GUILayout.Button("Start Tests");
+                            GUI.color = Color.white;
+                        } else {
+                            GUI.color = Color.red;
+                            events.StopTests = GUILayout.Button("Stop Tests");
+                            GUI.color = Color.white;
+                        }
+                        GUILayout.EndHorizontal();
+                        GUILayout.Space(10);
+                    }
 
                     GUILayout.Label("Available Editors:");
                     sVisible.ScrollPosition = EditorGUILayout.BeginScrollView(sVisible.ScrollPosition);
@@ -218,6 +241,14 @@ public class CoordinatorWindow : EditorWindow
         if (events.UpdateCoordinatePlay) {
             sVisible.CoordinationMode = (CoordinationModes)selectedOption;
             EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = selectedOption;
+        }
+        if (events.StartTests) {
+            EditorApplication.isPlaying = true;
+            UntilExitSettings.Coordinator_TestState = (int)TestStates.Running;
+        }
+        if (events.StopTests) {
+            EditorApplication.isPlaying = false;
+            UntilExitSettings.Coordinator_TestState = (int)TestStates.Idle;
         }
         if (events.EditorAdd != default) {
             var original = EditorPaths.PopulateEditorInfo(Paths.ProjectPath);
