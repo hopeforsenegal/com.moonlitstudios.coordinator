@@ -57,23 +57,23 @@ public class SessionStateConvenientListInt
     public void Queue(int value) => SessionState.SetIntArray(m_Key, new List<int>(SessionState.GetIntArray(m_Key, new int[] { })) { value }.ToArray());// @value add
     public int Dequeue()
     {
-        int[] array = Get();
+        var array = Get();
         Clear();
-        for (int i = 1; i < array.Length - 1; i++) Queue(array[i]);
+        for (var i = 1; i < array.Length - 1; i++) Queue(array[i]);
         return array[0];
     }
 }
 public struct PathToProcessId
-{   // Format is 'long/project/path|1234124' and we store all of them seperated by ;
+{   // Format is 'long/project/path|1234124' and we store all of them separated by ;
     public string path;
     public int processID;
-    public const string Seperator = "|";
+    public const string Separator = "|";
     public const string End = ";";
 
-    public static string Join(params PathToProcessId[] pathToProcesIds)
+    public static string Join(params PathToProcessId[] pathToProcessIds)
     {
         var result = string.Empty;
-        foreach (var p in pathToProcesIds) result += $"{p.path}{Seperator}{p.processID}{End}";
+        foreach (var p in pathToProcessIds) result += $"{p.path}{Separator}{p.processID}{End}";
         return result;
     }
     public static PathToProcessId[] Split(string toParse)
@@ -83,7 +83,7 @@ public struct PathToProcessId
         foreach (var p in pathToProcessIdSplit) {
             if (string.IsNullOrWhiteSpace(p)) continue;
 
-            var split = p.Split(Seperator);
+            var split = p.Split(Separator);
             if (int.TryParse(split[1], out var resultProcessId)) {
                 result.Add(new PathToProcessId { path = split[0], processID = resultProcessId });
             } else {
@@ -118,7 +118,7 @@ public struct EditorPaths
 [InitializeOnLoad] // Without being in a InitializeOnLoad, the EnteredPlaymode event will get dropped in OriginalCoordinatePlaymodeStateChanged. We also cannot put that functionality in a EditorWindow/CoordinatorWindow
 public static class Editors
 {
-    private static float RefreshInterval;
+    private static float sRefreshInterval;
     private static readonly List<string> EndPointsToProcess = new List<string>();
     private static readonly SessionStateConvenientListInt Playmode = new SessionStateConvenientListInt(nameof(Playmode));
 
@@ -183,10 +183,10 @@ public static class Editors
 
     private static void AdditionalUpdate()
     {
-        if (RefreshInterval > 0) {
-            RefreshInterval -= Time.deltaTime;
+        if (sRefreshInterval > 0) {
+            sRefreshInterval -= Time.deltaTime;
         } else {
-            RefreshInterval = .5f; // Refresh every half second
+            sRefreshInterval = .5f; // Refresh every half second
 
             if (int.TryParse(UntilExitSettings.Coordinator_ParentProcessID, out var processId)) {
                 if (!IsProcessAlive(processId)) {
@@ -267,11 +267,11 @@ public static class Editors
 
         Directory.CreateDirectory(destinationPath);
 
-        foreach (FileInfo file in dir.GetFiles()) {
+        foreach (var file in dir.GetFiles()) {
             file.CopyTo(Path.Combine(destinationPath, file.Name));
         }
 
-        foreach (DirectoryInfo subDir in dirs) {
+        foreach (var subDir in dirs) {
             Hardcopy(subDir.FullName, Path.Combine(destinationPath, subDir.Name));
         }
     }

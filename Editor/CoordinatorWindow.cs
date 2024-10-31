@@ -16,7 +16,8 @@ public class CoordinatorWindow : EditorWindow
     public static void ShowWindow() => GetWindow(typeof(CoordinatorWindow));
 
     public const int MaximumAmountOfEditors = 6;
-    public struct Visible
+
+    private struct Visible
     {
         public Vector2 ScrollPosition;
         public float RefreshInterval;
@@ -30,7 +31,8 @@ public class CoordinatorWindow : EditorWindow
         public bool[] IsSymlinked;
         public PathToProcessId[] PathToProcessIds;
     }
-    public struct Events
+
+    private struct Events
     {
         public int Index;
         public EditorType EditorAdd;
@@ -41,14 +43,14 @@ public class CoordinatorWindow : EditorWindow
         public bool UpdateCoordinatePlay;
         public bool Settings;
         public bool Github;
-        internal bool StartTests;
-        internal bool StopTests;
+        public bool StartTests;
+        public bool StopTests;
     }
 
     private static Visible sVisible;
     private static ProjectSettings sProjectSettingsInMemory;
-    private static int selectedOption, previousSelection = 0;
-    private static readonly string[] options = { CoordinationModes.Standalone.ToString(), CoordinationModes.Playmode.ToString(), CoordinationModes.TestAndPlaymode.ToString() };
+    private static int sSelectedOption, sPreviousSelection = 0;
+    private static readonly string[] Options = { CoordinationModes.Standalone.ToString(), CoordinationModes.Playmode.ToString(), CoordinationModes.TestAndPlaymode.ToString() };
 
     protected void CreateGUI()
     {
@@ -59,20 +61,20 @@ public class CoordinatorWindow : EditorWindow
 
         var existingDefines = sProjectSettingsInMemory.scriptingDefineSymbols;
         var existingCommandLineParams = sProjectSettingsInMemory.commandlineParams;
-        for (int i = 0; i < MaximumAmountOfEditors && i < existingDefines.Length; i++) {
+        for (var i = 0; i < MaximumAmountOfEditors && i < existingDefines.Length; i++) {
             if (string.IsNullOrWhiteSpace(existingDefines[i])) continue;
 
             UnityEngine.Debug.Log($"[{i}] Using scripting define '{existingDefines[i]}'");
             sVisible.ScriptingDefineSymbols[i] = existingDefines[i];
             sVisible.PreviousScriptingDefineSymbols[i] = existingDefines[i];
         }
-        for (int i = 0; i < MaximumAmountOfEditors && i < existingCommandLineParams.Length; i++) {
+        for (var i = 0; i < MaximumAmountOfEditors && i < existingCommandLineParams.Length; i++) {
             if (string.IsNullOrWhiteSpace(existingCommandLineParams[i])) continue;
 
             UnityEngine.Debug.Log($"[{i}] Using command line param  '{existingCommandLineParams[i]}'");
             sVisible.CommandLineParams[i] = existingCommandLineParams[i];
         }
-        for (int i = 0; i < MaximumAmountOfEditors; i++) sVisible.IsShowFoldout[i] = true;
+        for (var i = 0; i < MaximumAmountOfEditors; i++) sVisible.IsShowFoldout[i] = true;
 
         EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
     }
@@ -85,13 +87,13 @@ public class CoordinatorWindow : EditorWindow
         sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
         sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
         sVisible.IsSymlinked = new bool[MaximumAmountOfEditors];
-        selectedOption = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
+        sSelectedOption = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
     }
 
     protected void OnGUI()
     {
         var events = new Events();
-        previousSelection = selectedOption;
+        sPreviousSelection = sSelectedOption;
 
         if (sVisible.RefreshInterval > 0) {
             sVisible.RefreshInterval -= Time.deltaTime;
@@ -112,7 +114,7 @@ public class CoordinatorWindow : EditorWindow
             if (sVisible.IsSymlinked == null) {
                 InitializeVisibleMemory();
             }
-            for (int i = 0; i < sVisible.Path.Length; i++) {
+            for (var i = 0; i < sVisible.Path.Length; i++) {
                 sVisible.IsSymlinked[i] = Editors.IsSymlinked(sVisible.Path[i]);
             }
         }
@@ -125,22 +127,22 @@ public class CoordinatorWindow : EditorWindow
 
         EditorGUI.BeginDisabledGroup(EditorApplication.isPlaying);
         if (Editors.IsAdditional()) {
-            EditorGUILayout.HelpBox($"You can only launch additional editors from the original editor.", MessageType.Info);
+            EditorGUILayout.HelpBox("You can only launch additional editors from the original editor.", MessageType.Info);
         } else {
             if (sVisible.Path != null && sVisible.Path.Length >= 2) {
                 GUILayout.BeginVertical();
                 {
                     GUILayout.Space(10);
                     GUILayout.Label("Coordination Mode:");
-                    selectedOption = GUILayout.SelectionGrid(selectedOption, options, options.Length);
-                    if (selectedOption != previousSelection) events.UpdateCoordinatePlay = true;
+                    sSelectedOption = GUILayout.SelectionGrid(sSelectedOption, Options, Options.Length);
+                    if (sSelectedOption != sPreviousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(10);
 
                     if (sVisible.CoordinationMode == CoordinationModes.TestAndPlaymode) {
                         var testState = (TestStates)UntilExitSettings.Coordinator_TestState;
                         GUILayout.BeginHorizontal();
                         GUILayout.BeginVertical();
-                        EditorGUILayout.LabelField($"Status:");
+                        EditorGUILayout.LabelField("Status:");
                         EditorGUILayout.HelpBox($"{testState}", MessageType.None);
                         GUILayout.EndVertical();
                         if (testState == TestStates.Idle) {
@@ -159,7 +161,7 @@ public class CoordinatorWindow : EditorWindow
                     GUILayout.Label("Available Editors:");
                     sVisible.ScrollPosition = EditorGUILayout.BeginScrollView(sVisible.ScrollPosition);
 
-                    for (int i = 0; i < sVisible.Path.Length; i++) {
+                    for (var i = 0; i < sVisible.Path.Length; i++) {
                         var editor = sVisible.Path[i];
                         var editorInfo = EditorPaths.PopulateEditorInfo(editor);
                         var isRunningProject = false;
@@ -188,7 +190,7 @@ public class CoordinatorWindow : EditorWindow
                                 EditorGUI.EndDisabledGroup();
 
                                 if (sVisible.CoordinationMode != CoordinationModes.Standalone) {
-                                    EditorGUILayout.LabelField("Scripting Define Symbols on Play [';' seperated] (Note: This Overwrites! We will improve this in the future)");
+                                    EditorGUILayout.LabelField("Scripting Define Symbols on Play [';' separated] (Note: This Overwrites! We will improve this in the future)");
                                     GUILayout.BeginHorizontal();
                                     sVisible.ScriptingDefineSymbols[i] = EditorGUILayout.TextField(sVisible.ScriptingDefineSymbols[i], EditorStyles.textField);
                                     GUILayout.EndHorizontal();
@@ -239,8 +241,8 @@ public class CoordinatorWindow : EditorWindow
             SettingsService.OpenProjectSettings(CoordinatorSettingsProvider.MenuLocationInProjectSettings);
         }
         if (events.UpdateCoordinatePlay) {
-            sVisible.CoordinationMode = (CoordinationModes)selectedOption;
-            EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = selectedOption;
+            sVisible.CoordinationMode = (CoordinationModes)sSelectedOption;
+            EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = sSelectedOption;
         }
         if (events.StartTests) {
             EditorApplication.isPlaying = true;
@@ -299,7 +301,7 @@ public class CoordinatorWindow : EditorWindow
         SaveProjectSettings();
     }
 
-    private void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
+    private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
         if (playmodeState != PlayModeStateChange.ExitingEditMode) return;
         SaveProjectSettings();
