@@ -120,7 +120,7 @@ public class CoordinatorWindow : EditorWindow
         }
 
         /*- UI -*/
-        GUILayout.BeginHorizontal();
+        GUILayout.BeginHorizontal("box");
         events.Settings = GUILayout.Button("Settings");
         events.Github = GUILayout.Button("Github");
         GUILayout.EndHorizontal();
@@ -132,59 +132,70 @@ public class CoordinatorWindow : EditorWindow
             if (sVisible.Path != null && sVisible.Path.Length >= 2) {
                 GUILayout.BeginVertical();
                 {
-                    GUILayout.Space(10);
-                    GUILayout.Label("Coordination Mode:");
+                    GUILayout.Space(20);
+                    GUILayout.BeginHorizontal();
+                    GUILayout.FlexibleSpace();
+                    GUILayout.Label("Current Coordination Mode", EditorStyles.boldLabel);
+                    GUILayout.FlexibleSpace();
+                    GUILayout.EndHorizontal();
                     sSelectedOption = GUILayout.SelectionGrid(sSelectedOption, Options, Options.Length);
                     if (sSelectedOption != sPreviousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(10);
 
                     if (sVisible.CoordinationMode == CoordinationModes.TestAndPlaymode) {
                         var testState = (TestStates)UntilExitSettings.Coordinator_TestState;
-                        GUILayout.BeginHorizontal();
-                        GUILayout.BeginVertical();
-                        EditorGUILayout.LabelField("Status:");
-                        EditorGUILayout.HelpBox($"{testState}", MessageType.None);
-                        GUILayout.EndVertical();
-                        if (testState == TestStates.Idle) {
-                            GUI.color = Color.green;
-                            events.StartTests = GUILayout.Button("Start Tests");
-                            GUI.color = Color.white;
-                        } else {
-                            GUI.color = Color.red;
-                            events.StopTests = GUILayout.Button("Stop Tests");
-                            GUI.color = Color.white;
+                        using (new EditorGUILayout.HorizontalScope("box")) {
+                            GUILayout.BeginVertical();
+                            EditorGUILayout.LabelField("Status:");
+                            EditorGUILayout.HelpBox($"{testState}", MessageType.None);
+                            GUILayout.EndVertical();
+                            if (testState == TestStates.Idle) {
+                                GUI.color = Color.green;
+                                events.StartTests = GUILayout.Button("Start Tests");
+                                GUI.color = Color.white;
+                            } else {
+                                GUI.color = Color.red;
+                                events.StopTests = GUILayout.Button("Stop Tests");
+                                GUI.color = Color.white;
+                            }
                         }
-                        GUILayout.EndHorizontal();
                         GUILayout.Space(10);
                     }
 
-                    GUILayout.Label("Available Editors:");
                     sVisible.ScrollPosition = EditorGUILayout.BeginScrollView(sVisible.ScrollPosition);
 
                     for (var i = 0; i < sVisible.Path.Length; i++) {
                         var editor = sVisible.Path[i];
                         var editorInfo = EditorPaths.PopulateEditorInfo(editor);
-                        var isRunningProject = false;
+                        var isProcessRunningForProject = false;
                         foreach (var p in sVisible.PathToProcessIds) {
                             if (p.path == editorInfo.Path) {
-                                isRunningProject = true;
+                                isProcessRunningForProject = true;
                                 break;
                             }
                         }
-                        GUILayout.BeginVertical();
+                        GUILayout.BeginVertical("GroupBox");
 
                         events.Index = i;
-                        sVisible.IsShowFoldout[i] = EditorGUILayout.Foldout(sVisible.IsShowFoldout[i], editorInfo.Name);
+                        using (new EditorGUILayout.HorizontalScope()) {
+                            sVisible.IsShowFoldout[i] = EditorGUILayout.Foldout(sVisible.IsShowFoldout[i], string.Empty, true);
+                            if (isProcessRunningForProject) {
+                                GUILayout.Label($"{editorInfo.Name} [Open]", EditorStyles.boldLabel);
+                            } else {
+                                GUILayout.Label(editorInfo.Name);
+                            }
+                            GUILayout.FlexibleSpace();
+                        }
                         if (sVisible.IsShowFoldout[i]) {
                             var editorType = sVisible.IsSymlinked[i] ? EditorType.Symlink : EditorType.HardCopy;
                             if (i != 0) EditorGUILayout.HelpBox($"{editorType}", MessageType.Info);
                             GUILayout.BeginHorizontal();
                             EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
-                            events.ShowInFinder = GUILayout.Button("Open in Finder") ? editorInfo.Path : events.ShowInFinder;
+                            events.ShowInFinder = GUILayout.Button("Open in Finder", GUILayout.Width(170)) ? editorInfo.Path : events.ShowInFinder;
                             GUILayout.EndHorizontal();
 
                             if (i != 0) {
-                                EditorGUI.BeginDisabledGroup(isRunningProject);
+                                EditorGUI.BeginDisabledGroup(isProcessRunningForProject);
                                 EditorGUILayout.LabelField("Command Line Params");
                                 sVisible.CommandLineParams[i] = EditorGUILayout.TextField(sVisible.CommandLineParams[i], EditorStyles.textField);
                                 EditorGUI.EndDisabledGroup();
@@ -198,10 +209,10 @@ public class CoordinatorWindow : EditorWindow
 
                                 GUILayout.Space(10);
                                 GUILayout.BeginHorizontal();
-                                EditorGUI.BeginDisabledGroup(isRunningProject);
+                                EditorGUI.BeginDisabledGroup(isProcessRunningForProject);
                                 events.EditorOpen = GUILayout.Button("Open Editor") ? editorInfo.Path : events.EditorOpen;
                                 EditorGUI.EndDisabledGroup();
-                                EditorGUI.BeginDisabledGroup(!isRunningProject);
+                                EditorGUI.BeginDisabledGroup(!isProcessRunningForProject);
                                 events.EditorClose = GUILayout.Button("Close Editor") ? editorInfo.Path : events.EditorClose;
                                 EditorGUI.EndDisabledGroup();
                                 GUILayout.EndHorizontal();
@@ -215,7 +226,6 @@ public class CoordinatorWindow : EditorWindow
                             }
                         }
                         GUILayout.EndVertical();
-                        GUILayout.Space(10);
                     }
 
                     EditorGUILayout.EndScrollView();
@@ -225,12 +235,14 @@ public class CoordinatorWindow : EditorWindow
                 EditorGUILayout.HelpBox("Nothing to coordinate with. No additional editors are available yet.", MessageType.Info);
             }
 
+            GUILayout.BeginVertical("box");
             GUILayout.BeginHorizontal();
             events.EditorAdd = (sVisible.Path.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorType.Symlink} Editor") ? EditorType.Symlink : events.EditorAdd;
             events.EditorAdd = (sVisible.Path.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorType.HardCopy} Editor") ? EditorType.HardCopy : events.EditorAdd;
             GUILayout.EndHorizontal();
             EditorGUI.EndDisabledGroup();
             events.ShowInFinder = GUILayout.Button("Show Editors in Finder") ? Paths.ProjectRootPath : events.ShowInFinder;
+            GUILayout.EndVertical();
         }
 
         /*- Handle Events -*/

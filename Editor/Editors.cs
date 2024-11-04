@@ -67,8 +67,8 @@ public struct PathToProcessId
 {   // Format is 'long/project/path|1234124' and we store all of them separated by ;
     public string path;
     public int processID;
-    public const string Separator = "|";
-    public const string End = ";";
+    private const string Separator = "|";
+    private const string End = ";";
 
     public static string Join(params PathToProcessId[] pathToProcessIds)
     {
