@@ -47,10 +47,26 @@ public class CoordinatorWindow : EditorWindow
         public bool StopTests;
     }
 
+    internal class BackgroundColorScope : GUI.Scope
+    {
+        private readonly Color m_Color;
+
+        public BackgroundColorScope(Color tempColor)
+        {
+            m_Color = GUI.backgroundColor;
+            GUI.backgroundColor = tempColor;
+        }
+        protected override void CloseScope()
+        {
+            GUI.backgroundColor = m_Color;
+        }
+    }
+
     private static Visible sVisible;
     private static ProjectSettings sProjectSettingsInMemory;
     private static int sSelectedOption, sPreviousSelection = 0;
-    private static readonly Color Red = new Color(255 / 255f, 235 / 255f, 235 / 255f);
+    private static readonly Color DeleteRed = new Color(255 / 255f, 235 / 255f, 235 / 255f);
+    private static readonly Color TestGreen = new Color(230 / 255f, 255 / 255f, 230 / 255f);
     private static readonly string[] Options = { CoordinationModes.Standalone.ToString(), CoordinationModes.Playmode.ToString(), CoordinationModes.TestAndPlaymode.ToString() };
 
     protected void CreateGUI()
@@ -146,14 +162,12 @@ public class CoordinatorWindow : EditorWindow
                     if (sVisible.CoordinationMode == CoordinationModes.TestAndPlaymode) {
                         var testState = (TestStates)UntilExitSettings.Coordinator_TestState;
                         using (new EditorGUILayout.HorizontalScope("box")) {
-                            if (testState == TestStates.Off) {
-                                GUI.color = Color.green;
-                                events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
-                                GUI.color = Color.white;
-                            } else {
-                                GUI.color = Color.red;
-                                events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
-                                GUI.color = Color.white;
+                            using (new BackgroundColorScope(testState == TestStates.Off ? TestGreen : Color.red)) {
+                                if (testState == TestStates.Off) {
+                                    events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
+                                } else {
+                                    events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
+                                }
                             }
                             GUILayout.BeginHorizontal();
                             GUILayout.Space(30);
@@ -228,16 +242,15 @@ public class CoordinatorWindow : EditorWindow
                                     padding = new RectOffset(10, 10, 5, 5),
                                     margin = new RectOffset(2, 2, 2, 2),
                                 };
-                                var originalColor = GUI.backgroundColor;
-                                GUI.backgroundColor = Red;
-                                if (GUILayout.Button("Delete Editor", customButtonStyle)) {
-                                    events.EditorDelete = EditorUtility.DisplayDialog(
-                                        "Delete this editor?",
-                                        "Are you sure you want to delete this editor?",
-                                        "Delete",
-                                        "Cancel") ? editorInfo.Path : events.EditorDelete;
+                                using (new BackgroundColorScope(DeleteRed)) {
+                                    if (GUILayout.Button("Delete Editor", customButtonStyle)) {
+                                        events.EditorDelete = EditorUtility.DisplayDialog(
+                                            "Delete this editor?",
+                                            "Are you sure you want to delete this editor?",
+                                            "Delete",
+                                            "Cancel") ? editorInfo.Path : events.EditorDelete;
+                                    }
                                 }
-                                GUI.backgroundColor = originalColor;
                             }
                         }
                         GUILayout.EndVertical();
