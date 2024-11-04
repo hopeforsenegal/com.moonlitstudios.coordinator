@@ -160,7 +160,7 @@ public static class Editors
     private static void AdditionalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
         if (playmodeState == PlayModeStateChange.ExitingPlayMode && UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional) {
-            var ok = EditorUtility.DisplayDialog("Coordinated Playmode", "This was a coordinated Play mode session. Please exit playmode from the Original Editor.", "OK", "Exit Playmode");
+            var ok = EditorUtility.DisplayDialog("Coordinated Play", "Playmode was started from the Original Editor. Please exit playmode from the Original Editor.", "OK", "Exit Playmode");
             if (ok) {
                 EditorApplication.isPlaying = true;
             } else {
@@ -175,8 +175,19 @@ public static class Editors
             var playmode = (PlayModeStateChange)Playmode.Dequeue();
             UnityEngine.Debug.Log($"Writing command '{playmode}'");
             switch (playmode) {
-                case PlayModeStateChange.EnteredPlayMode: SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Play(ProjectSettings.LoadInstance().scriptingDefineSymbols)); break;
-                case PlayModeStateChange.EnteredEditMode: SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Edit); break;
+                case PlayModeStateChange.EnteredPlayMode: {
+                        var settings = ProjectSettings.LoadInstance();
+                        var scriptingDefines = new string[CoordinatorWindow.MaximumAmountOfEditors];
+                        for (int i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
+                            scriptingDefines[i] = settings.globalScriptingDefineSymbols + ";" + settings.scriptingDefineSymbols[i];
+                        }
+                        SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Play(scriptingDefines));
+                    }
+                    break;
+                case PlayModeStateChange.EnteredEditMode: {
+                        SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Edit);
+                    }
+                    break;
             }
         }
     }
@@ -241,39 +252,29 @@ public static class Editors
     public static bool IsAdditional() => Environment.CommandLine.Contains(CommandLineParams.Additional);
     public static string[] GetEditorsAvailable() => new List<string>(Directory.EnumerateDirectories(Paths.ProjectRootPath)).ToArray();
 
-    public static bool IsProcessAlive(int processId)
-    {
-        try { return !Process.GetProcessById(processId).HasExited; }
-        catch (ArgumentException) { return false; } // this should suffice unless we throw ArgumentException for multiple reasons
-    }
-
-    public static void Symlink(string sourcePath, string destinationPath)
-    {
-        ExecuteBashCommandLine($"ln -s {sourcePath.Replace(" ", "\\ ")} {destinationPath.Replace(" ", "\\ ")}");
-    }
-    public static void MarkAsSymlink(string destinationPath)
-    {
-        File.WriteAllText(Path.Combine(destinationPath, EditorType.Symlink.ToString()), "");
-    }
-    public static bool IsSymlinked(string destinationPath)
-    {
-        return File.Exists(Path.Combine(destinationPath, EditorType.Symlink.ToString()));
-    }
+    public static bool IsSymlinked(string destinationPath) => File.Exists(Path.Combine(destinationPath, EditorType.Symlink.ToString()));
+    public static void MarkAsSymlink(string destinationPath) => File.WriteAllText(Path.Combine(destinationPath, EditorType.Symlink.ToString()), "");
+    public static void Symlink(string sourcePath, string destinationPath) => ExecuteBashCommandLine($"ln -s {sourcePath.Replace(" ", "\\ ")} {destinationPath.Replace(" ", "\\ ")}");
 
     internal static void Hardcopy(string sourcePath, string destinationPath)
     {
         var dir = new DirectoryInfo(sourcePath);
-        var dirs = dir.GetDirectories();
+        var dirs = dir.GetDirectories(); // "get" directories before "create"
 
         Directory.CreateDirectory(destinationPath);
 
         foreach (var file in dir.GetFiles()) {
             file.CopyTo(Path.Combine(destinationPath, file.Name));
         }
-
         foreach (var subDir in dirs) {
             Hardcopy(subDir.FullName, Path.Combine(destinationPath, subDir.Name));
         }
+    }
+
+    public static bool IsProcessAlive(int processId)
+    {
+        try { return !Process.GetProcessById(processId).HasExited; }
+        catch (ArgumentException) { return false; } // this should suffice unless we throw ArgumentException for multiple reasons
     }
 
     private static void ExecuteBashCommandLine(string command)

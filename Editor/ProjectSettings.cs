@@ -28,4 +28,5 @@ public class ProjectSettings : ScriptableObject
 
     public string[] commandlineParams; // pass -coordinator flag to everyone
     public string[] scriptingDefineSymbols;
+    public string globalScriptingDefineSymbols;
 }

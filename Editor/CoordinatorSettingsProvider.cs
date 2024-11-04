@@ -9,6 +9,7 @@ public class CoordinatorSettingsProvider : SettingsProvider
     private SerializedObject m_ProjectSettings;
     private SerializedProperty m_CommandLineParams;
     private SerializedProperty m_ScriptingDefineSymbols;
+    private SerializedProperty m_GlobalScriptingDefineSymbols;
 
     private CoordinatorSettingsProvider(string path, SettingsScope scope = SettingsScope.Project) : base(path, scope) { }
 
@@ -20,6 +21,7 @@ public class CoordinatorSettingsProvider : SettingsProvider
         m_ProjectSettings = new SerializedObject(ProjectSettings.LoadInstance());
         m_CommandLineParams = m_ProjectSettings.FindProperty(nameof(ProjectSettings.commandlineParams));
         m_ScriptingDefineSymbols = m_ProjectSettings.FindProperty(nameof(ProjectSettings.scriptingDefineSymbols));
+        m_GlobalScriptingDefineSymbols = m_ProjectSettings.FindProperty(nameof(ProjectSettings.globalScriptingDefineSymbols));
     }
 
     public override void OnGUI(string searchContext)
@@ -31,6 +33,7 @@ public class CoordinatorSettingsProvider : SettingsProvider
         GUILayout.Label("Project Coordinator Settings:", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(m_CommandLineParams);
         EditorGUILayout.PropertyField(m_ScriptingDefineSymbols);
+        EditorGUILayout.PropertyField(m_GlobalScriptingDefineSymbols);
 
         /*- Events -*/
         m_ProjectSettings.ApplyModifiedProperties();

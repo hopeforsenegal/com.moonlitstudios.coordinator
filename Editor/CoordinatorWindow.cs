@@ -30,6 +30,7 @@ public class CoordinatorWindow : EditorWindow
         public bool[] IsShowFoldout;
         public bool[] IsSymlinked;
         public PathToProcessId[] PathToProcessIds;
+        internal string GlobalScriptingDefineSymbols;
     }
 
     private struct Events
@@ -64,7 +65,7 @@ public class CoordinatorWindow : EditorWindow
 
     private static Visible sVisible;
     private static ProjectSettings sProjectSettingsInMemory;
-    private static int sSelectedOption, sPreviousSelection = 0;
+    private static int sSelectedOption = 0;
     private static readonly Color DeleteRed = new Color(255 / 255f, 235 / 255f, 235 / 255f);
     private static readonly Color TestGreen = new Color(230 / 255f, 255 / 255f, 230 / 255f);
     private static readonly string[] Options = { CoordinationModes.Standalone.ToString(), CoordinationModes.Playmode.ToString(), CoordinationModes.TestAndPlaymode.ToString() };
@@ -78,6 +79,7 @@ public class CoordinatorWindow : EditorWindow
 
         var existingDefines = sProjectSettingsInMemory.scriptingDefineSymbols;
         var existingCommandLineParams = sProjectSettingsInMemory.commandlineParams;
+        sVisible.GlobalScriptingDefineSymbols = sProjectSettingsInMemory.globalScriptingDefineSymbols;
         for (var i = 0; i < MaximumAmountOfEditors && i < existingDefines.Length; i++) {
             if (string.IsNullOrWhiteSpace(existingDefines[i])) continue;
 
@@ -110,7 +112,7 @@ public class CoordinatorWindow : EditorWindow
     protected void OnGUI()
     {
         var events = new Events();
-        sPreviousSelection = sSelectedOption;
+        var previousSelection = sSelectedOption;
 
         if (sVisible.RefreshInterval > 0) {
             sVisible.RefreshInterval -= Time.deltaTime;
@@ -156,24 +158,30 @@ public class CoordinatorWindow : EditorWindow
                     GUILayout.FlexibleSpace();
                     GUILayout.EndHorizontal();
                     sSelectedOption = GUILayout.SelectionGrid(sSelectedOption, Options, Options.Length);
-                    if (sSelectedOption != sPreviousSelection) events.UpdateCoordinatePlay = true;
+                    if (sSelectedOption != previousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(10);
 
                     if (sVisible.CoordinationMode == CoordinationModes.TestAndPlaymode) {
                         var testState = (TestStates)UntilExitSettings.Coordinator_TestState;
-                        using (new EditorGUILayout.HorizontalScope("box")) {
-                            using (new BackgroundColorScope(testState == TestStates.Off ? TestGreen : Color.red)) {
-                                if (testState == TestStates.Off) {
-                                    events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
-                                } else {
-                                    events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
+                        using (new EditorGUILayout.VerticalScope("box")) {
+                            using (new EditorGUILayout.HorizontalScope()) {
+                                using (new BackgroundColorScope(testState == TestStates.Off ? TestGreen : Color.red)) {
+                                    if (testState == TestStates.Off) {
+                                        events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
+                                    } else {
+                                        events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
+                                    }
                                 }
+                                GUILayout.BeginHorizontal();
+                                GUILayout.Space(30);
+                                EditorGUI.LabelField(EditorGUILayout.GetControlRect(GUILayout.Width(50)), "Status:");
+                                EditorGUILayout.HelpBox($"{testState}", MessageType.None, true);
+                                GUILayout.FlexibleSpace();
+                                GUILayout.EndHorizontal();
                             }
+                            EditorGUILayout.LabelField("Global Scripting Define Symbols on Play [';' separated] (Note: This Overwrites! We will improve this in the future)");
                             GUILayout.BeginHorizontal();
-                            GUILayout.Space(30);
-                            EditorGUI.LabelField(EditorGUILayout.GetControlRect(GUILayout.Width(50)), "Status:");
-                            EditorGUILayout.HelpBox($"{testState}", MessageType.None, true);
-                            GUILayout.FlexibleSpace();
+                            sVisible.GlobalScriptingDefineSymbols = EditorGUILayout.TextField(sVisible.GlobalScriptingDefineSymbols, EditorStyles.textField);
                             GUILayout.EndHorizontal();
                         }
                         GUILayout.Space(10);
@@ -366,6 +374,7 @@ public class CoordinatorWindow : EditorWindow
         UnityEngine.Debug.Log($"Saving scripting {scriptingDefineCounts} define(s) and {commandLineParamCounts} command line param(s)");
         sProjectSettingsInMemory.scriptingDefineSymbols = sVisible.ScriptingDefineSymbols;
         sProjectSettingsInMemory.commandlineParams = sVisible.CommandLineParams;
+        sProjectSettingsInMemory.globalScriptingDefineSymbols = sVisible.GlobalScriptingDefineSymbols;
         EditorUtility.SetDirty(sProjectSettingsInMemory);
         AssetDatabase.SaveAssetIfDirty(sProjectSettingsInMemory);
     }
