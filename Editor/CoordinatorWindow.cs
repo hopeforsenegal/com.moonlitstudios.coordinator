@@ -50,6 +50,7 @@ public class CoordinatorWindow : EditorWindow
     private static Visible sVisible;
     private static ProjectSettings sProjectSettingsInMemory;
     private static int sSelectedOption, sPreviousSelection = 0;
+    private static readonly Color Red = new Color(255 / 255f, 235 / 255f, 235 / 255f);
     private static readonly string[] Options = { CoordinationModes.Standalone.ToString(), CoordinationModes.Playmode.ToString(), CoordinationModes.TestAndPlaymode.ToString() };
 
     protected void CreateGUI()
@@ -145,19 +146,21 @@ public class CoordinatorWindow : EditorWindow
                     if (sVisible.CoordinationMode == CoordinationModes.TestAndPlaymode) {
                         var testState = (TestStates)UntilExitSettings.Coordinator_TestState;
                         using (new EditorGUILayout.HorizontalScope("box")) {
-                            GUILayout.BeginVertical();
-                            EditorGUILayout.LabelField("Status:");
-                            EditorGUILayout.HelpBox($"{testState}", MessageType.None);
-                            GUILayout.EndVertical();
-                            if (testState == TestStates.Idle) {
+                            if (testState == TestStates.Off) {
                                 GUI.color = Color.green;
-                                events.StartTests = GUILayout.Button("Start Tests");
+                                events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
                                 GUI.color = Color.white;
                             } else {
                                 GUI.color = Color.red;
-                                events.StopTests = GUILayout.Button("Stop Tests");
+                                events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
                                 GUI.color = Color.white;
                             }
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Space(30);
+                            EditorGUI.LabelField(EditorGUILayout.GetControlRect(GUILayout.Width(50)), "Status:");
+                            EditorGUILayout.HelpBox($"{testState}", MessageType.None, true);
+                            GUILayout.FlexibleSpace();
+                            GUILayout.EndHorizontal();
                         }
                         GUILayout.Space(10);
                     }
@@ -216,13 +219,25 @@ public class CoordinatorWindow : EditorWindow
                                 events.EditorClose = GUILayout.Button("Close Editor") ? editorInfo.Path : events.EditorClose;
                                 EditorGUI.EndDisabledGroup();
                                 GUILayout.EndHorizontal();
-                                if (GUILayout.Button("Delete Editor")) {
+                                var customButtonStyle = new GUIStyle(GUI.skin.button)
+                                {
+                                    normal = { background = CreateColorTexture(new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },
+                                    active = { background = CreateColorTexture(new Color(0.1f, 0.1f, 0.1f)), textColor = Color.white },
+                                    hover = { textColor = Color.white },
+                                    fontSize = 12,
+                                    padding = new RectOffset(10, 10, 5, 5),
+                                    margin = new RectOffset(2, 2, 2, 2),
+                                };
+                                var originalColor = GUI.backgroundColor;
+                                GUI.backgroundColor = Red;
+                                if (GUILayout.Button("Delete Editor", customButtonStyle)) {
                                     events.EditorDelete = EditorUtility.DisplayDialog(
                                         "Delete this editor?",
                                         "Are you sure you want to delete this editor?",
                                         "Delete",
                                         "Cancel") ? editorInfo.Path : events.EditorDelete;
                                 }
+                                GUI.backgroundColor = originalColor;
                             }
                         }
                         GUILayout.EndVertical();
@@ -258,11 +273,11 @@ public class CoordinatorWindow : EditorWindow
         }
         if (events.StartTests) {
             EditorApplication.isPlaying = true;
-            UntilExitSettings.Coordinator_TestState = (int)TestStates.Running;
+            UntilExitSettings.Coordinator_TestState = (int)TestStates.Testing;
         }
         if (events.StopTests) {
             EditorApplication.isPlaying = false;
-            UntilExitSettings.Coordinator_TestState = (int)TestStates.Idle;
+            UntilExitSettings.Coordinator_TestState = (int)TestStates.Off;
         }
         if (events.EditorAdd != default) {
             var original = EditorPaths.PopulateEditorInfo(Paths.ProjectPath);
@@ -340,5 +355,13 @@ public class CoordinatorWindow : EditorWindow
         sProjectSettingsInMemory.commandlineParams = sVisible.CommandLineParams;
         EditorUtility.SetDirty(sProjectSettingsInMemory);
         AssetDatabase.SaveAssetIfDirty(sProjectSettingsInMemory);
+    }
+
+    private static Texture2D CreateColorTexture(Color color)
+    {
+        var texture = new Texture2D(1, 1);
+        texture.SetPixel(0, 0, color);
+        texture.Apply();
+        return texture;
     }
 }

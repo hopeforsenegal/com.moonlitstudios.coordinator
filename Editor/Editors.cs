@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 
 public enum EditorType { Symlink = 1, HardCopy }
 public enum CoordinationModes { Standalone, Playmode, TestAndPlaymode }
-public enum TestStates { Idle, Running, PostTest }
+public enum TestStates { Off, Testing, PostTest }
 public static class CommandLineParams
 {
     public static string Additional { get; } = "--additional";
