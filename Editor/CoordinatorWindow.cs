@@ -169,7 +169,9 @@ public class CoordinatorWindow : EditorWindow
                                     if (testState == TestStates.Off) {
                                         events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
                                     } else {
+                                        GUI.enabled = true;
                                         events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
+                                        GUI.enabled = false;
                                     }
                                 }
                                 GUILayout.BeginHorizontal();

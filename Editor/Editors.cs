@@ -28,7 +28,7 @@ public static class MessageEndpoint
 public static class Messages
 {
     public const string Edit = nameof(Edit);
-    internal static string Play(string[] scriptingDefineSymbols) => $"{nameof(Play)}|{string.Join(";", scriptingDefineSymbols)}";
+    internal static string Play(string[] scriptingDefineSymbols) => $"{nameof(Play)}|{string.Join(":", scriptingDefineSymbols)}";
 }
 public static class Paths
 {
@@ -123,11 +123,12 @@ public static class Editors
     private static readonly List<string> EndPointsToProcess = new List<string>();
     private static readonly SessionStateConvenientListInt Playmode = new SessionStateConvenientListInt(nameof(Playmode));
     private static readonly Thread backgroundThread;
+    private static NamedBuildTarget BuildTarget { get; } = NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone);
 
     static Editors()
     {
         if (!IsAdditional()) {
-            UnityEngine.Debug.Log("Is Original");
+            UnityEngine.Debug.Log($"Is Original. [{PlayerSettings.GetScriptingDefineSymbols(BuildTarget)}]");
             var path = EditorSceneManager.GetActiveScene().path;
             if (!string.IsNullOrWhiteSpace(path)) {
                 UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(EditorSceneManager.GetActiveScene().name));
@@ -136,7 +137,9 @@ public static class Editors
             EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged;
             EditorApplication.update += OriginalUpdate;
         } else {
-            UnityEngine.Debug.Log($"Is Additional. Command Line [{Environment.CommandLine}]");
+            UnityEngine.Debug.Log($"Is Additional. " +
+                $"\nCommand Line [{Environment.CommandLine}] " +
+                $"\nCurrent Scripting Defines [{PlayerSettings.GetScriptingDefineSymbols(BuildTarget)}]");
             SocketLayer.OpenListenerOnFile(MessageEndpoint.Playmode);
             SocketLayer.OpenListenerOnFile(MessageEndpoint.Scene);
             var args = Environment.GetCommandLineArgs();
@@ -157,7 +160,6 @@ public static class Editors
         while (true) {
             EditorApplication.delayCall += () =>  // Ensure we're on the main thread for Unity operations
             {
-                UnityEngine.Debug.Log("Editor update at: " + System.DateTime.Now);
                 EditorApplication.QueuePlayerLoopUpdate();
                 SceneView.RepaintAll();
             };
@@ -168,16 +170,22 @@ public static class Editors
     private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
         var playSetting = (CoordinationModes)EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
+        UnityEngine.Debug.Log($"OriginalCoordinatePlaymodeStateChanged {playmodeState} {playSetting}");
         if (playSetting == CoordinationModes.Standalone) return;
         if (playmodeState == PlayModeStateChange.ExitingPlayMode) return;
-        if (playmodeState == PlayModeStateChange.ExitingEditMode) return;
+
+        if (playmodeState == PlayModeStateChange.ExitingEditMode) {
+            UnityEngine.Debug.Log($"What? {playSetting}");
+            if (playSetting == CoordinationModes.TestAndPlaymode) {
+                UnityEngine.Debug.Log($"Updating Original Scripting Defines '{ProjectSettings.LoadInstance().globalScriptingDefineSymbols}'. Then doing asset database refresh.");
+                PlayerSettings.SetScriptingDefineSymbols(BuildTarget, ProjectSettings.LoadInstance().globalScriptingDefineSymbols);
+                AssetDatabase.Refresh();
+            }
+            return;
+        }
 
         Playmode.Queue((int)playmodeState); // We queue these for later because domain reloads
 
-        if (playSetting == CoordinationModes.TestAndPlaymode && playmodeState == PlayModeStateChange.EnteredPlayMode) {
-            PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone), ProjectSettings.LoadInstance().globalScriptingDefineSymbols);
-            AssetDatabase.Refresh();
-        }
     }
 
     private static void AdditionalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
@@ -237,23 +245,29 @@ public static class Editors
                 UnityEngine.Debug.Log($"We consumed message '{message}'");
                 if (endpoint == MessageEndpoint.Playmode) {
                     var split = message.Split("|");
-                    if (split.Length == 2) {
-                        UnityEngine.Debug.Log($"Updating Scripting Defines '{split[1]}'. Then doing asset database refresh.");
-                        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone), split[1]);
-                        AssetDatabase.Refresh();
+                    UnityEngine.Debug.Assert(split.Length == 2);
+                    var scriptingDefinesForAllEditors = split[1];
+                    var scriptingDefinesSplit = scriptingDefinesForAllEditors.Split(':');
+                    var forAdditionalOne = scriptingDefinesSplit[1];
+                    UnityEngine.Debug.Assert(scriptingDefinesSplit.Length == CoordinatorWindow.MaximumAmountOfEditors, $"Scripting defines should always be {CoordinatorWindow.MaximumAmountOfEditors} and not {scriptingDefinesSplit.Length}");
+                    UnityEngine.Debug.Log($"Updating Additional Scripting Defines '{scriptingDefinesForAllEditors}' " +
+                        $"\n+ [{forAdditionalOne}]'. Then doing asset database refresh.");
+
+                    switch (split[0]) {
+                        case nameof(Messages.Play): UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true; EditorApplication.isPlaying = true; break;
+                        case nameof(Messages.Edit): UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false; EditorApplication.isPlaying = false; break;
                     }
 
                     EditorApplication.delayCall += () =>
-                    {   // This would logic is just to focus the window so we go into playmode
+                    {   // This logic is just to focus the window so we go into playmode
                         var sceneView = SceneView.lastActiveSceneView;
                         if (sceneView == null) sceneView = EditorWindow.CreateWindow<SceneView>();
                         sceneView.Show();
                         sceneView.Focus();
                     };
-                    switch (split[0]) {
-                        case nameof(Messages.Play): UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true; EditorApplication.isPlaying = true; break;
-                        case nameof(Messages.Edit): UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false; EditorApplication.isPlaying = false; break;
-                    }
+
+                    PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone), split[1]);
+                    AssetDatabase.Refresh();
                 }
                 if (endpoint == MessageEndpoint.Scene) {
                     if (SceneManager.GetActiveScene().path != message) {
