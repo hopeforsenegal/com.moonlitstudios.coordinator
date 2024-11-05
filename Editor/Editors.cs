@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
@@ -65,15 +66,15 @@ public class SessionStateConvenientListInt
 }
 public struct PathToProcessId
 {   // Format is 'long/project/path|1234124' and we store all of them separated by ;
-    public string path;
-    public int processID;
+    public string Path;
+    public int ProcessID;
     private const string Separator = "|";
     private const string End = ";";
 
     public static string Join(params PathToProcessId[] pathToProcessIds)
     {
         var result = string.Empty;
-        foreach (var p in pathToProcessIds) result += $"{p.path}{Separator}{p.processID}{End}";
+        foreach (var p in pathToProcessIds) result += $"{p.Path}{Separator}{p.ProcessID}{End}";
         return result;
     }
     public static PathToProcessId[] Split(string toParse)
@@ -85,7 +86,7 @@ public struct PathToProcessId
 
             var split = p.Split(Separator);
             if (int.TryParse(split[1], out var resultProcessId)) {
-                result.Add(new PathToProcessId { path = split[0], processID = resultProcessId });
+                result.Add(new PathToProcessId { Path = split[0], ProcessID = resultProcessId });
             } else {
                 UnityEngine.Debug.LogWarning($"We failed to parse the {nameof(PathToProcessId)} on path '{split[0]}'");
             }
@@ -121,6 +122,7 @@ public static class Editors
     private static float sRefreshInterval;
     private static readonly List<string> EndPointsToProcess = new List<string>();
     private static readonly SessionStateConvenientListInt Playmode = new SessionStateConvenientListInt(nameof(Playmode));
+    private static readonly Thread backgroundThread;
 
     static Editors()
     {
@@ -144,17 +146,38 @@ public static class Editors
                     UntilExitSettings.Coordinator_ParentProcessID = args[i + 1];
                 }
             }
+            backgroundThread = new Thread(BackgroundUpdate);
+            backgroundThread.Start();
             EditorApplication.playModeStateChanged += AdditionalCoordinatePlaymodeStateChanged;
             EditorApplication.update += AdditionalUpdate;
+        }
+    }
+    private static void BackgroundUpdate()
+    {
+        while (true) {
+            EditorApplication.delayCall += () =>  // Ensure we're on the main thread for Unity operations
+            {
+                UnityEngine.Debug.Log("Editor update at: " + System.DateTime.Now);
+                EditorApplication.QueuePlayerLoopUpdate();
+                SceneView.RepaintAll();
+            };
+            Thread.Sleep(1000);
         }
     }
 
     private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
-        if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == (int)CoordinationModes.Standalone) return;
+        var playSetting = (CoordinationModes)EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
+        if (playSetting == CoordinationModes.Standalone) return;
         if (playmodeState == PlayModeStateChange.ExitingPlayMode) return;
         if (playmodeState == PlayModeStateChange.ExitingEditMode) return;
+
         Playmode.Queue((int)playmodeState); // We queue these for later because domain reloads
+
+        if (playSetting == CoordinationModes.TestAndPlaymode && playmodeState == PlayModeStateChange.EnteredPlayMode) {
+            PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone), ProjectSettings.LoadInstance().globalScriptingDefineSymbols);
+            AssetDatabase.Refresh();
+        }
     }
 
     private static void AdditionalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
@@ -178,7 +201,7 @@ public static class Editors
                 case PlayModeStateChange.EnteredPlayMode: {
                         var settings = ProjectSettings.LoadInstance();
                         var scriptingDefines = new string[CoordinatorWindow.MaximumAmountOfEditors];
-                        for (int i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
+                        for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
                             scriptingDefines[i] = settings.globalScriptingDefineSymbols + ";" + settings.scriptingDefineSymbols[i];
                         }
                         SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Play(scriptingDefines));
@@ -221,10 +244,9 @@ public static class Editors
                     }
 
                     EditorApplication.delayCall += () =>
-                    {
+                    {   // This would logic is just to focus the window so we go into playmode
                         var sceneView = SceneView.lastActiveSceneView;
                         if (sceneView == null) sceneView = EditorWindow.CreateWindow<SceneView>();
-
                         sceneView.Show();
                         sceneView.Focus();
                     };

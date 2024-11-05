@@ -48,7 +48,7 @@ public class CoordinatorWindow : EditorWindow
         public bool StopTests;
     }
 
-    internal class BackgroundColorScope : GUI.Scope
+    private class BackgroundColorScope : GUI.Scope
     {
         private readonly Color m_Color;
 
@@ -122,7 +122,7 @@ public class CoordinatorWindow : EditorWindow
             var pathToProcessIds = PathToProcessId.Split(UntilExitSettings.Coordinator_ProjectPathToChildProcessID);
             var updatedListOfProcesses = new List<PathToProcessId>();
             foreach (var p in pathToProcessIds) {
-                if (Editors.IsProcessAlive(p.processID)) {
+                if (Editors.IsProcessAlive(p.ProcessID)) {
                     updatedListOfProcesses.Add(p);
                 }
             }
@@ -194,7 +194,7 @@ public class CoordinatorWindow : EditorWindow
                         var editorInfo = EditorPaths.PopulateEditorInfo(editor);
                         var isProcessRunningForProject = false;
                         foreach (var p in sVisible.PathToProcessIds) {
-                            if (p.path == editorInfo.Path) {
+                            if (p.Path == editorInfo.Path) {
                                 isProcessRunningForProject = true;
                                 break;
                             }
@@ -320,7 +320,7 @@ public class CoordinatorWindow : EditorWindow
             UnityEngine.Debug.Assert(Directory.Exists(events.EditorOpen), "No Editor at location");
             var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.AdditionalEditorParams} {sVisible.CommandLineParams[events.Index]}");
             var processIds = new List<PathToProcessId>(sVisible.PathToProcessIds);
-            processIds.Add(new PathToProcessId { path = events.EditorOpen, processID = process.Id });
+            processIds.Add(new PathToProcessId { Path = events.EditorOpen, ProcessID = process.Id });
             UntilExitSettings.Coordinator_ProjectPathToChildProcessID = PathToProcessId.Join(processIds.ToArray());
             sVisible.PathToProcessIds = processIds.ToArray();
             SaveProjectSettings();
@@ -328,8 +328,8 @@ public class CoordinatorWindow : EditorWindow
         if (!string.IsNullOrWhiteSpace(events.EditorClose)) {
             var pathToProcessIds = sVisible.PathToProcessIds;
             foreach (var p in pathToProcessIds) {
-                if (p.path == events.EditorClose) {
-                    Process.GetProcessById(p.processID).Kill(); // Is calling Kill() twice bad? Probably not so we don't need to update local memory
+                if (p.Path == events.EditorClose) {
+                    Process.GetProcessById(p.ProcessID).Kill(); // Is calling Kill() twice bad? Probably not so we don't need to update local memory
                     break;
                 }
             }
