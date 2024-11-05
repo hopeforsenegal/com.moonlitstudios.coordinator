@@ -63,6 +63,21 @@ public class CoordinatorWindow : EditorWindow
         }
     }
 
+    private class EnableGroupScope : GUI.Scope
+    {
+        private readonly bool m_Enabled;
+
+        public EnableGroupScope(bool enabled)
+        {
+            m_Enabled = GUI.enabled;
+            GUI.enabled = enabled;
+        }
+        protected override void CloseScope()
+        {
+            GUI.enabled = m_Enabled;
+        }
+    }
+
     private static Visible sVisible;
     private static ProjectSettings sProjectSettingsInMemory;
     private static int sSelectedOption = 0;
@@ -169,9 +184,9 @@ public class CoordinatorWindow : EditorWindow
                                     if (testState == TestStates.Off) {
                                         events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
                                     } else {
-                                        GUI.enabled = true;
-                                        events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
-                                        GUI.enabled = false;
+                                        using (new EnableGroupScope(true)) {
+                                            events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
+                                        }
                                     }
                                 }
                                 GUILayout.BeginHorizontal();
