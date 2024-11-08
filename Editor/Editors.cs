@@ -245,17 +245,27 @@ public static class Editors
                 UnityEngine.Debug.Log($"We consumed message '{message}'");
                 if (endpoint == MessageEndpoint.Playmode) {
                     var split = message.Split("|");
-                    UnityEngine.Debug.Assert(split.Length == 2);
-                    var scriptingDefinesForAllEditors = split[1];
-                    var scriptingDefinesSplit = scriptingDefinesForAllEditors.Split(':');
-                    var forAdditionalOne = scriptingDefinesSplit[1];
-                    UnityEngine.Debug.Assert(scriptingDefinesSplit.Length == CoordinatorWindow.MaximumAmountOfEditors, $"Scripting defines should always be {CoordinatorWindow.MaximumAmountOfEditors} and not {scriptingDefinesSplit.Length}");
-                    UnityEngine.Debug.Log($"Updating Additional Scripting Defines '{scriptingDefinesForAllEditors}' " +
-                        $"\n+ [{forAdditionalOne}]'. Then doing asset database refresh.");
+                    var messageType = split[0];
+                    var forAdditionalOne = string.Empty;
+                    if (split.Length == 2) {
+                        var scriptingDefinesForAllEditors = split[1];
+                        var scriptingDefinesSplit = scriptingDefinesForAllEditors.Split(':');
+                        forAdditionalOne = scriptingDefinesSplit[1];
+                        UnityEngine.Debug.Assert(scriptingDefinesSplit.Length == CoordinatorWindow.MaximumAmountOfEditors, $"Scripting defines should always be {CoordinatorWindow.MaximumAmountOfEditors} and not {scriptingDefinesSplit.Length}");
+                        UnityEngine.Debug.Log($"Updating Additional Scripting Defines '{scriptingDefinesForAllEditors}' " +
+                            $"\n+ [{forAdditionalOne}]'. Then doing asset database refresh.");
+                    }
 
-                    switch (split[0]) {
-                        case nameof(Messages.Play): UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true; EditorApplication.isPlaying = true; break;
-                        case nameof(Messages.Edit): UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false; EditorApplication.isPlaying = false; break;
+                    if (messageType == nameof(Messages.Play)) {
+                        UnityEngine.Debug.Assert(split.Length == 2);
+                        UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true;
+                        EditorApplication.isPlaying = true;
+                        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone), forAdditionalOne);
+                    }
+                    if (messageType == nameof(Messages.Edit)) {
+                        UnityEngine.Debug.Assert(split.Length == 1);
+                        UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false;
+                        EditorApplication.isPlaying = false;
                     }
 
                     EditorApplication.delayCall += () =>
@@ -266,7 +276,6 @@ public static class Editors
                         sceneView.Focus();
                     };
 
-                    PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone), split[1]);
                     AssetDatabase.Refresh();
                 }
                 if (endpoint == MessageEndpoint.Scene) {
