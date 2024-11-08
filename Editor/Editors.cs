@@ -155,6 +155,15 @@ public static class Editors
             EditorApplication.update += AdditionalUpdate;
         }
     }
+
+    public static void TestComplete()
+    {
+        EditorApplication.isPlaying = false;
+        UntilExitSettings.Coordinator_TestState = (int)TestStates.Off;
+        UnityEngine.Debug.Log("Placeholder");
+        // We will probably call post build bethods with an attribute since that is the standard
+    }
+
     private static void BackgroundUpdate()
     {
         while (true) {
