@@ -9,10 +9,10 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public enum EditorType { Symlink = 1, HardCopy }
-public enum CoordinationModes { Standalone, Playmode, TestAndPlaymode }
-public enum TestStates { Off, Testing, PostTest }
-public static class CommandLineParams
+internal enum EditorType { Symlink = 1, HardCopy }
+internal enum CoordinationModes { Standalone, Playmode, TestAndPlaymode }
+internal enum TestStates { Off, Testing, PostTest }
+internal static class CommandLineParams
 {
     public static string Additional { get; } = "--additional";
     public static string Original { get; } = "-original";
@@ -20,33 +20,33 @@ public static class CommandLineParams
 
     public static string AdditionalEditorParams { get; } = string.Join(" ", Additional, OriginalProcessID);
 }
-public static class MessageEndpoint
+internal static class MessageEndpoint
 {
     public static string Playmode { get; } = Path.Combine(Paths.ProjectRootPath, nameof(PlayModeStateChange));
     public static string Scene { get; } = Path.Combine(Paths.ProjectRootPath, nameof(UnityEngine.SceneManagement.Scene));
 }
-public static class Messages
+internal static class Messages
 {
     public const string Edit = nameof(Edit);
     internal static string Play(string[] scriptingDefineSymbols) => $"{nameof(Play)}|{string.Join(":", scriptingDefineSymbols)}";
 }
-public static class Paths
+internal static class Paths
 {
     public static string ProjectPath { get; } = Application.dataPath.Replace("/Assets", "");
     public static string ProjectRootPath { get; } = Path.GetFullPath(Path.Combine(ProjectPath, ".."));
 }
-public static class EditorUserSettings
+internal static class EditorUserSettings
 {
     public static int Coordinator_CoordinatePlaySettingOnOriginal { get => EditorPrefs.GetInt(nameof(Coordinator_CoordinatePlaySettingOnOriginal), 0); set => EditorPrefs.SetInt(nameof(Coordinator_CoordinatePlaySettingOnOriginal), value); }
 }
-public static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
+internal static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
 {
     public static int Coordinator_TestState { get => SessionState.GetInt(nameof(Coordinator_TestState), 0); set => SessionState.SetInt(nameof(Coordinator_TestState), value); }
     public static string Coordinator_ParentProcessID { get => SessionState.GetString(nameof(Coordinator_ParentProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ParentProcessID), value); }
     public static string Coordinator_ProjectPathToChildProcessID { get => SessionState.GetString(nameof(Coordinator_ProjectPathToChildProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ProjectPathToChildProcessID), value); }
     public static bool Coordinator_IsCoordinatePlayThisSessionOnAdditional { get => SessionState.GetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), value ? 1 : 0); }
 }
-public class SessionStateConvenientListInt
+internal class SessionStateConvenientListInt
 {
     private readonly string m_Key;
 
@@ -64,7 +64,7 @@ public class SessionStateConvenientListInt
         return array[0];
     }
 }
-public struct PathToProcessId
+internal struct PathToProcessId
 {   // Format is 'long/project/path|1234124' and we store all of them separated by ;
     public string Path;
     public int ProcessID;
@@ -94,7 +94,7 @@ public struct PathToProcessId
         return result.ToArray();
     }
 }
-public struct EditorPaths
+internal struct EditorPaths
 {
     public string Name;
     public string Path;
@@ -122,7 +122,6 @@ public static class Editors
     private static float sRefreshInterval;
     private static readonly List<string> EndPointsToProcess = new List<string>();
     private static readonly SessionStateConvenientListInt Playmode = new SessionStateConvenientListInt(nameof(Playmode));
-    private static readonly Thread backgroundThread;
     private static NamedBuildTarget BuildTarget { get; } = NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone);
 
     static Editors()
@@ -137,7 +136,7 @@ public static class Editors
             EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged;
             EditorApplication.update += OriginalUpdate;
         } else {
-            UnityEngine.Debug.Log($"Is Additional. " +
+            UnityEngine.Debug.Log("Is Additional. " +
                 $"\nCommand Line [{Environment.CommandLine}] " +
                 $"\nCurrent Scripting Defines [{PlayerSettings.GetScriptingDefineSymbols(BuildTarget)}]");
             SocketLayer.OpenListenerOnFile(MessageEndpoint.Playmode);
@@ -149,7 +148,7 @@ public static class Editors
                     UntilExitSettings.Coordinator_ParentProcessID = args[i + 1];
                 }
             }
-            backgroundThread = new Thread(BackgroundUpdate);
+            var backgroundThread = new Thread(BackgroundUpdate);
             backgroundThread.Start();
             EditorApplication.playModeStateChanged += AdditionalCoordinatePlaymodeStateChanged;
             EditorApplication.update += AdditionalUpdate;
@@ -160,8 +159,6 @@ public static class Editors
     {
         EditorApplication.isPlaying = false;
         UntilExitSettings.Coordinator_TestState = (int)TestStates.Off;
-        UnityEngine.Debug.Log("Placeholder");
-        // We will probably call post build bethods with an attribute since that is the standard
     }
 
     private static void BackgroundUpdate()
@@ -184,7 +181,6 @@ public static class Editors
         if (playmodeState == PlayModeStateChange.ExitingPlayMode) return;
 
         if (playmodeState == PlayModeStateChange.ExitingEditMode) {
-            UnityEngine.Debug.Log($"What? {playSetting}");
             if (playSetting == CoordinationModes.TestAndPlaymode) {
                 UnityEngine.Debug.Log($"Updating Original Scripting Defines '{ProjectSettings.LoadInstance().globalScriptingDefineSymbols}'. Then doing asset database refresh.");
                 PlayerSettings.SetScriptingDefineSymbols(BuildTarget, ProjectSettings.LoadInstance().globalScriptingDefineSymbols);
@@ -194,7 +190,6 @@ public static class Editors
         }
 
         Playmode.Queue((int)playmodeState); // We queue these for later because domain reloads
-
     }
 
     private static void AdditionalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
@@ -306,9 +301,9 @@ public static class Editors
     public static bool IsAdditional() => Environment.CommandLine.Contains(CommandLineParams.Additional);
     public static string[] GetEditorsAvailable() => new List<string>(Directory.EnumerateDirectories(Paths.ProjectRootPath)).ToArray();
 
-    public static bool IsSymlinked(string destinationPath) => File.Exists(Path.Combine(destinationPath, EditorType.Symlink.ToString()));
-    public static void MarkAsSymlink(string destinationPath) => File.WriteAllText(Path.Combine(destinationPath, EditorType.Symlink.ToString()), "");
-    public static void Symlink(string sourcePath, string destinationPath) => ExecuteBashCommandLine($"ln -s {sourcePath.Replace(" ", "\\ ")} {destinationPath.Replace(" ", "\\ ")}");
+    internal static bool IsSymlinked(string destinationPath) => File.Exists(Path.Combine(destinationPath, EditorType.Symlink.ToString()));
+    internal static void MarkAsSymlink(string destinationPath) => File.WriteAllText(Path.Combine(destinationPath, EditorType.Symlink.ToString()), "");
+    internal static void Symlink(string sourcePath, string destinationPath) => ExecuteBashCommandLine($"ln -s {sourcePath.Replace(" ", "\\ ")} {destinationPath.Replace(" ", "\\ ")}");
 
     internal static void Hardcopy(string sourcePath, string destinationPath)
     {
@@ -325,7 +320,7 @@ public static class Editors
         }
     }
 
-    public static bool IsProcessAlive(int processId)
+    internal static bool IsProcessAlive(int processId)
     {
         try { return !Process.GetProcessById(processId).HasExited; }
         catch (ArgumentException) { return false; } // this should suffice unless we throw ArgumentException for multiple reasons
