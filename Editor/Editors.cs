@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading;
 using UnityEditor;
 using UnityEditor.Build;
+using UnityEditor.Compilation;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -41,7 +42,7 @@ internal static class EditorUserSettings
 }
 internal static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
 {
-    public static int Coordinator_TestState { get => SessionState.GetInt(nameof(Coordinator_TestState), 0); set => SessionState.SetInt(nameof(Coordinator_TestState), value); }
+    public static TestStates Coordinator_TestState { get => (TestStates)SessionState.GetInt(nameof(Coordinator_TestState), 0); set => SessionState.SetInt(nameof(Coordinator_TestState), (int)value); }
     public static string Coordinator_ParentProcessID { get => SessionState.GetString(nameof(Coordinator_ParentProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ParentProcessID), value); }
     public static string Coordinator_ProjectPathToChildProcessID { get => SessionState.GetString(nameof(Coordinator_ProjectPathToChildProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ProjectPathToChildProcessID), value); }
     public static bool Coordinator_IsCoordinatePlayThisSessionOnAdditional { get => SessionState.GetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), value ? 1 : 0); }
@@ -135,6 +136,7 @@ public static class Editors
             }
             EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged;
             EditorApplication.update += OriginalUpdate;
+            CompilationPipeline.assemblyCompilationFinished += OriginalOnCompilationFinished;
         } else {
             UnityEngine.Debug.Log("Is Additional. " +
                 $"\nCommand Line [{Environment.CommandLine}] " +
@@ -170,6 +172,18 @@ public static class Editors
                 SceneView.RepaintAll();
             };
             Thread.Sleep(1000);
+        }
+    }
+
+    private static void OriginalOnCompilationFinished(string assemblyPath, CompilerMessage[] messages)
+    {
+        if (UntilExitSettings.Coordinator_TestState != TestStates.Testing) return;
+
+        foreach (var message in messages) {
+            if (message.type != CompilerMessageType.Error) continue;
+
+            UntilExitSettings.Coordinator_TestState = (int)TestStates.Off;
+            UnityEngine.Debug.LogError("Compilation errors detected! Aborting Tests!"); break;
         }
     }
 
@@ -299,7 +313,15 @@ public static class Editors
     }
 
     public static bool IsAdditional() => Environment.CommandLine.Contains(CommandLineParams.Additional);
-    public static string[] GetEditorsAvailable() => new List<string>(Directory.EnumerateDirectories(Paths.ProjectRootPath)).ToArray();
+    public static string[] GetEditorsAvailable()
+    {
+        var editorsAvailable = new List<string>();
+        foreach (var dir in Directory.EnumerateDirectories(Paths.ProjectRootPath)) {
+            if (dir.Contains(".git")) continue;
+            editorsAvailable.Add(dir);
+        }
+        return editorsAvailable.ToArray();
+    }
 
     internal static bool IsSymlinked(string destinationPath) => File.Exists(Path.Combine(destinationPath, EditorType.Symlink.ToString()));
     internal static void MarkAsSymlink(string destinationPath) => File.WriteAllText(Path.Combine(destinationPath, EditorType.Symlink.ToString()), "");

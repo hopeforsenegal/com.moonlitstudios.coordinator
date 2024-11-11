@@ -15,13 +15,14 @@ public class CoordinatorWindow : EditorWindow
     [MenuItem("Moonlit/Coordinator/Coordinate", priority = 20)]
     public static void ShowWindow() => GetWindow(typeof(CoordinatorWindow));
 
-    public const int MaximumAmountOfEditors = 6;
-
     private struct Visible
     {
         public Vector2 ScrollPosition;
+        public int SelectedOption;
         public float RefreshInterval;
         public CoordinationModes CoordinationMode;
+        public PathToProcessId[] PathToProcessIds;
+        public string GlobalScriptingDefineSymbols;
         // NOTE: We are Struct of arrays (instead of Array of structs). This is to ensure our compatibility of the string arrays across domains (ex. ProjectSettings)
         public string[] ScriptingDefineSymbols;
         public string[] PreviousScriptingDefineSymbols;
@@ -29,8 +30,6 @@ public class CoordinatorWindow : EditorWindow
         public string[] Path;
         public bool[] IsShowFoldout;
         public bool[] IsSymlinked;
-        public PathToProcessId[] PathToProcessIds;
-        internal string GlobalScriptingDefineSymbols;
     }
 
     private struct Events
@@ -51,39 +50,23 @@ public class CoordinatorWindow : EditorWindow
     private class BackgroundColorScope : GUI.Scope
     {
         private readonly Color m_Color;
-
-        public BackgroundColorScope(Color tempColor)
-        {
-            m_Color = GUI.backgroundColor;
-            GUI.backgroundColor = tempColor;
-        }
-        protected override void CloseScope()
-        {
-            GUI.backgroundColor = m_Color;
-        }
+        public BackgroundColorScope(Color tempColor) { m_Color = GUI.backgroundColor; GUI.backgroundColor = tempColor; }
+        protected override void CloseScope() => GUI.backgroundColor = m_Color;
     }
 
     private class EnableGroupScope : GUI.Scope
     {
         private readonly bool m_Enabled;
-
-        public EnableGroupScope(bool enabled)
-        {
-            m_Enabled = GUI.enabled;
-            GUI.enabled = enabled;
-        }
-        protected override void CloseScope()
-        {
-            GUI.enabled = m_Enabled;
-        }
+        public EnableGroupScope(bool enabled) { m_Enabled = GUI.enabled; GUI.enabled = enabled; }
+        protected override void CloseScope() => GUI.enabled = m_Enabled;
     }
 
-    private static Visible sVisible;
-    private static ProjectSettings sProjectSettingsInMemory;
-    private static int sSelectedOption = 0;
+    public const int MaximumAmountOfEditors = 6;
     private static readonly Color DeleteRed = new Color(255 / 255f, 235 / 255f, 235 / 255f);
     private static readonly Color TestGreen = new Color(230 / 255f, 255 / 255f, 230 / 255f);
     private static readonly string[] Options = { CoordinationModes.Standalone.ToString(), CoordinationModes.Playmode.ToString(), CoordinationModes.TestAndPlaymode.ToString() };
+    private static Visible sVisible;
+    private static ProjectSettings sProjectSettingsInMemory;
 
     protected void CreateGUI()
     {
@@ -121,13 +104,13 @@ public class CoordinatorWindow : EditorWindow
         sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
         sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
         sVisible.IsSymlinked = new bool[MaximumAmountOfEditors];
-        sSelectedOption = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
+        sVisible.SelectedOption = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
     }
 
     protected void OnGUI()
     {
         var events = new Events();
-        var previousSelection = sSelectedOption;
+        var previousSelection = sVisible.SelectedOption;
 
         if (sVisible.RefreshInterval > 0) {
             sVisible.RefreshInterval -= Time.deltaTime;
@@ -172,12 +155,12 @@ public class CoordinatorWindow : EditorWindow
                     GUILayout.Label("Current Coordination Mode", EditorStyles.boldLabel);
                     GUILayout.FlexibleSpace();
                     GUILayout.EndHorizontal();
-                    sSelectedOption = GUILayout.SelectionGrid(sSelectedOption, Options, Options.Length);
-                    if (sSelectedOption != previousSelection) events.UpdateCoordinatePlay = true;
+                    sVisible.SelectedOption = GUILayout.SelectionGrid(sVisible.SelectedOption, Options, Options.Length);
+                    if (sVisible.SelectedOption != previousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(10);
 
                     if (sVisible.CoordinationMode == CoordinationModes.TestAndPlaymode) {
-                        var testState = (TestStates)UntilExitSettings.Coordinator_TestState;
+                        var testState = UntilExitSettings.Coordinator_TestState;
                         using (new EditorGUILayout.VerticalScope("box")) {
                             using (new EditorGUILayout.HorizontalScope()) {
                                 using (new BackgroundColorScope(testState == TestStates.Off ? TestGreen : Color.red)) {
@@ -306,16 +289,16 @@ public class CoordinatorWindow : EditorWindow
             SettingsService.OpenProjectSettings(CoordinatorSettingsProvider.MenuLocationInProjectSettings);
         }
         if (events.UpdateCoordinatePlay) {
-            sVisible.CoordinationMode = (CoordinationModes)sSelectedOption;
-            EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = sSelectedOption;
+            sVisible.CoordinationMode = (CoordinationModes)sVisible.SelectedOption;
+            EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = sVisible.SelectedOption;
         }
         if (events.StartTests) {
             EditorApplication.isPlaying = true;
-            UntilExitSettings.Coordinator_TestState = (int)TestStates.Testing;
+            UntilExitSettings.Coordinator_TestState = TestStates.Testing;
         }
         if (events.StopTests) {
             EditorApplication.isPlaying = false;
-            UntilExitSettings.Coordinator_TestState = (int)TestStates.Off;
+            UntilExitSettings.Coordinator_TestState = TestStates.Off;
         }
         if (events.EditorAdd != default) {
             var original = EditorPaths.PopulateEditorInfo(Paths.ProjectPath);
