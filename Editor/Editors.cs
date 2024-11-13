@@ -17,7 +17,7 @@ internal static class CommandLineParams
 {
     public static string Additional { get; } = "--additional";
     public static string Original { get; } = "-original";
-    public static string OriginalProcessID { get; } = $"{Original} {Process.GetCurrentProcess().Id}";
+    private static string OriginalProcessID { get; } = $"{Original} {Process.GetCurrentProcess().Id}";
 
     public static string AdditionalEditorParams { get; } = string.Join(" ", Additional, OriginalProcessID);
 }
@@ -45,15 +45,17 @@ internal static class UntilExitSettings // SessionState is cleared when Unity ex
     public static TestStates Coordinator_TestState { get => (TestStates)SessionState.GetInt(nameof(Coordinator_TestState), 0); set => SessionState.SetInt(nameof(Coordinator_TestState), (int)value); }
     public static string Coordinator_ParentProcessID { get => SessionState.GetString(nameof(Coordinator_ParentProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ParentProcessID), value); }
     public static string Coordinator_ProjectPathToChildProcessID { get => SessionState.GetString(nameof(Coordinator_ProjectPathToChildProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ProjectPathToChildProcessID), value); }
+    public static string Coordinator_CurrentGlobalScriptingDefines { get => SessionState.GetString(nameof(Coordinator_CurrentGlobalScriptingDefines), string.Empty); set => SessionState.SetString(nameof(Coordinator_CurrentGlobalScriptingDefines), value); }
     public static bool Coordinator_IsCoordinatePlayThisSessionOnAdditional { get => SessionState.GetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), value ? 1 : 0); }
+    public static bool Coordinator_HasDelayEnterPlaymode { get => SessionState.GetInt(nameof(Coordinator_HasDelayEnterPlaymode), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_HasDelayEnterPlaymode), value ? 1 : 0); }
 }
 internal class SessionStateConvenientListInt
 {
     private readonly string m_Key;
 
     public SessionStateConvenientListInt(string key) => m_Key = key;
-    public int[] Get() => SessionState.GetIntArray(m_Key, new int[] { });
-    public void Clear() => SessionState.EraseIntArray(m_Key);
+    private int[] Get() => SessionState.GetIntArray(m_Key, new int[] { });
+    private void Clear() => SessionState.EraseIntArray(m_Key);
     public int Count() => Get().Length;
 
     public void Queue(int value) => SessionState.SetIntArray(m_Key, new List<int>(SessionState.GetIntArray(m_Key, new int[] { })) { value }.ToArray());// @value add
@@ -123,15 +125,15 @@ public static class Editors
     private static float sRefreshInterval;
     private static readonly List<string> EndPointsToProcess = new List<string>();
     private static readonly SessionStateConvenientListInt Playmode = new SessionStateConvenientListInt(nameof(Playmode));
-    private static NamedBuildTarget BuildTarget { get; } = NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone);
+    public static NamedBuildTarget BuildTarget { get; } = NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone);
 
     static Editors()
     {
         if (!IsAdditional()) {
             UnityEngine.Debug.Log($"Is Original. [{PlayerSettings.GetScriptingDefineSymbols(BuildTarget)}]");
-            var path = EditorSceneManager.GetActiveScene().path;
+            var path = SceneManager.GetActiveScene().path;
             if (!string.IsNullOrWhiteSpace(path)) {
-                UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(EditorSceneManager.GetActiveScene().name));
+                UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(SceneManager.GetActiveScene().name));
                 SocketLayer.WriteMessage(MessageEndpoint.Scene, path);
             }
             EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged;
@@ -159,6 +161,7 @@ public static class Editors
 
     public static void TestComplete()
     {
+        UnityEngine.Debug.Log("<color=green>Tests Complete!</color>");
         EditorApplication.isPlaying = false;
         UntilExitSettings.Coordinator_TestState = (int)TestStates.Off;
     }
@@ -173,6 +176,7 @@ public static class Editors
             };
             Thread.Sleep(1000);
         }
+        // ReSharper disable once FunctionNeverReturns
     }
 
     private static void OriginalOnCompilationFinished(string assemblyPath, CompilerMessage[] messages)
@@ -193,15 +197,6 @@ public static class Editors
         UnityEngine.Debug.Log($"OriginalCoordinatePlaymodeStateChanged {playmodeState} {playSetting}");
         if (playSetting == CoordinationModes.Standalone) return;
         if (playmodeState == PlayModeStateChange.ExitingPlayMode) return;
-
-        if (playmodeState == PlayModeStateChange.ExitingEditMode) {
-            if (playSetting == CoordinationModes.TestAndPlaymode) {
-                UnityEngine.Debug.Log($"Updating Original Scripting Defines '{ProjectSettings.LoadInstance().globalScriptingDefineSymbols}'. Then doing asset database refresh.");
-                PlayerSettings.SetScriptingDefineSymbols(BuildTarget, ProjectSettings.LoadInstance().globalScriptingDefineSymbols);
-                AssetDatabase.Refresh();
-            }
-            return;
-        }
 
         Playmode.Queue((int)playmodeState); // We queue these for later because domain reloads
     }
@@ -228,7 +223,7 @@ public static class Editors
                         var settings = ProjectSettings.LoadInstance();
                         var scriptingDefines = new string[CoordinatorWindow.MaximumAmountOfEditors];
                         for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
-                            scriptingDefines[i] = settings.globalScriptingDefineSymbols + ";" + settings.scriptingDefineSymbols[i];
+                            scriptingDefines[i] = PlayerSettings.GetScriptingDefineSymbols(BuildTarget) + ";" + settings.scriptingDefineSymbols[i];
                         }
                         SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Play(scriptingDefines));
                     }
@@ -237,6 +232,9 @@ public static class Editors
                         SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Edit);
                     }
                     break;
+                case PlayModeStateChange.ExitingEditMode: break; // ignore
+                case PlayModeStateChange.ExitingPlayMode: break;// ignore
+                default: throw new ArgumentOutOfRangeException();// ignore
             }
         }
     }
@@ -278,7 +276,13 @@ public static class Editors
                         UnityEngine.Debug.Assert(split.Length == 2);
                         UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true;
                         EditorApplication.isPlaying = true;
-                        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone), forAdditionalOne);
+
+                        foreach (var group in (BuildTargetGroup[])Enum.GetValues(typeof(BuildTargetGroup))) {
+                            if (group == BuildTargetGroup.Unknown) continue;
+
+                            try { PlayerSettings.SetScriptingDefineSymbolsForGroup(group, forAdditionalOne); }
+                            catch (ArgumentException) { }
+                        }
                     }
                     if (messageType == nameof(Messages.Edit)) {
                         UnityEngine.Debug.Assert(split.Length == 1);
@@ -327,7 +331,7 @@ public static class Editors
     internal static void MarkAsSymlink(string destinationPath) => File.WriteAllText(Path.Combine(destinationPath, EditorType.Symlink.ToString()), "");
     internal static void Symlink(string sourcePath, string destinationPath) => ExecuteBashCommandLine($"ln -s {sourcePath.Replace(" ", "\\ ")} {destinationPath.Replace(" ", "\\ ")}");
 
-    internal static void Hardcopy(string sourcePath, string destinationPath)
+    internal static void HardCopy(string sourcePath, string destinationPath)
     {
         var dir = new DirectoryInfo(sourcePath);
         var dirs = dir.GetDirectories(); // "get" directories before "create"
@@ -338,7 +342,7 @@ public static class Editors
             file.CopyTo(Path.Combine(destinationPath, file.Name));
         }
         foreach (var subDir in dirs) {
-            Hardcopy(subDir.FullName, Path.Combine(destinationPath, subDir.Name));
+            HardCopy(subDir.FullName, Path.Combine(destinationPath, subDir.Name));
         }
     }
 

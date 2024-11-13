@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -77,7 +78,7 @@ public class CoordinatorWindow : EditorWindow
 
         var existingDefines = sProjectSettingsInMemory.scriptingDefineSymbols;
         var existingCommandLineParams = sProjectSettingsInMemory.commandlineParams;
-        sVisible.GlobalScriptingDefineSymbols = sProjectSettingsInMemory.globalScriptingDefineSymbols;
+        sVisible.GlobalScriptingDefineSymbols = PlayerSettings.GetScriptingDefineSymbols(Editors.BuildTarget);
         for (var i = 0; i < MaximumAmountOfEditors && i < existingDefines.Length; i++) {
             if (string.IsNullOrWhiteSpace(existingDefines[i])) continue;
 
@@ -134,6 +135,13 @@ public class CoordinatorWindow : EditorWindow
             for (var i = 0; i < sVisible.Path.Length; i++) {
                 sVisible.IsSymlinked[i] = Editors.IsSymlinked(sVisible.Path[i]);
             }
+        }
+        if (UntilExitSettings.Coordinator_HasDelayEnterPlaymode) {
+            if (EditorApplication.isCompiling) return;
+            if (EditorApplication.isUpdating) return;
+
+            UntilExitSettings.Coordinator_HasDelayEnterPlaymode = false;
+            EditorApplication.isPlaying = true; // the amount of silent failures to domain reloads is insane
         }
 
         /*- UI -*/
@@ -293,8 +301,14 @@ public class CoordinatorWindow : EditorWindow
             EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = sVisible.SelectedOption;
         }
         if (events.StartTests) {
-            EditorApplication.isPlaying = true;
             UntilExitSettings.Coordinator_TestState = TestStates.Testing;
+            SaveProjectSettings();
+            AssetDatabase.Refresh();
+
+            EditorApplication.delayCall += () =>
+            {
+                UntilExitSettings.Coordinator_HasDelayEnterPlaymode = true;
+            };
         }
         if (events.StopTests) {
             EditorApplication.isPlaying = false;
@@ -311,9 +325,9 @@ public class CoordinatorWindow : EditorWindow
                 Editors.Symlink(original.Packages, additional.Packages);
                 Editors.MarkAsSymlink(additional.Path);
             } else {
-                Editors.Hardcopy(original.Assets, additional.Assets);
-                Editors.Hardcopy(original.ProjectSettings, additional.ProjectSettings);
-                Editors.Hardcopy(original.Packages, additional.Packages);
+                Editors.HardCopy(original.Assets, additional.Assets);
+                Editors.HardCopy(original.ProjectSettings, additional.ProjectSettings);
+                Editors.HardCopy(original.Packages, additional.Packages);
             }
         }
         if (!string.IsNullOrWhiteSpace(events.EditorOpen)) {
@@ -371,12 +385,19 @@ public class CoordinatorWindow : EditorWindow
                 commandLineParamCounts++;
             }
         }
-        UnityEngine.Debug.Log($"Saving scripting {scriptingDefineCounts} define(s) and {commandLineParamCounts} command line param(s)");
+        UnityEngine.Debug.Log($"Saving scripting {scriptingDefineCounts} define(s) and {commandLineParamCounts} command line param(s) with '{PlayerSettings.GetScriptingDefineSymbols(Editors.BuildTarget)}' vs '{sVisible.GlobalScriptingDefineSymbols}'");
         sProjectSettingsInMemory.scriptingDefineSymbols = sVisible.ScriptingDefineSymbols;
         sProjectSettingsInMemory.commandlineParams = sVisible.CommandLineParams;
-        sProjectSettingsInMemory.globalScriptingDefineSymbols = sVisible.GlobalScriptingDefineSymbols;
+
+        foreach (var group in (BuildTargetGroup[])Enum.GetValues(typeof(BuildTargetGroup))) {
+            if (group == BuildTargetGroup.Unknown) continue;
+
+            try { PlayerSettings.SetScriptingDefineSymbolsForGroup(group, sVisible.GlobalScriptingDefineSymbols); }
+            catch (ArgumentException) { }
+        }
+
+        UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
         EditorUtility.SetDirty(sProjectSettingsInMemory);
-        AssetDatabase.SaveAssetIfDirty(sProjectSettingsInMemory);
     }
 
     private static Texture2D CreateColorTexture(Color color)
