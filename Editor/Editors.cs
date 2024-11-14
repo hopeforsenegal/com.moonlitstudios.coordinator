@@ -275,7 +275,10 @@ public static class Editors
                     if (messageType == nameof(Messages.Play)) {
                         UnityEngine.Debug.Assert(split.Length == 2);
                         UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true;
-                        EditorApplication.isPlaying = true;
+                        EditorApplication.delayCall += () =>
+                        {
+                            EditorApplication.isPlaying = true;
+                        };
 
                         foreach (var group in (BuildTargetGroup[])Enum.GetValues(typeof(BuildTargetGroup))) {
                             if (group == BuildTargetGroup.Unknown) continue;
