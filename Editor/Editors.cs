@@ -215,6 +215,14 @@ public static class Editors
 
     private static void OriginalUpdate()
     {
+        if (UntilExitSettings.Coordinator_HasDelayEnterPlaymode) {
+            if (EditorApplication.isCompiling) return;
+            if (EditorApplication.isUpdating) return;
+
+            UntilExitSettings.Coordinator_HasDelayEnterPlaymode = false;
+            EditorApplication.isPlaying = true; // the amount of silent failures to domain reloads is insane
+        }
+
         if (Playmode.Count() > 0) {
             var playmode = (PlayModeStateChange)Playmode.Dequeue();
             UnityEngine.Debug.Log($"Writing command '{playmode}'");
@@ -241,6 +249,14 @@ public static class Editors
 
     private static void AdditionalUpdate()
     {
+        if (UntilExitSettings.Coordinator_HasDelayEnterPlaymode) {
+            if (EditorApplication.isCompiling) return;
+            if (EditorApplication.isUpdating) return;
+
+            UntilExitSettings.Coordinator_HasDelayEnterPlaymode = false;
+            EditorApplication.isPlaying = true; // the amount of silent failures to domain reloads is insane
+        }
+
         if (sRefreshInterval > 0) {
             sRefreshInterval -= Time.deltaTime;
         } else {
@@ -275,10 +291,7 @@ public static class Editors
                     if (messageType == nameof(Messages.Play)) {
                         UnityEngine.Debug.Assert(split.Length == 2);
                         UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true;
-                        EditorApplication.delayCall += () =>
-                        {
-                            EditorApplication.isPlaying = true;
-                        };
+                        UntilExitSettings.Coordinator_HasDelayEnterPlaymode = true;
 
                         foreach (var group in (BuildTargetGroup[])Enum.GetValues(typeof(BuildTargetGroup))) {
                             if (group == BuildTargetGroup.Unknown) continue;

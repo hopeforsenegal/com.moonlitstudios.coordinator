@@ -136,13 +136,6 @@ public class CoordinatorWindow : EditorWindow
                 sVisible.IsSymlinked[i] = Editors.IsSymlinked(sVisible.Path[i]);
             }
         }
-        if (UntilExitSettings.Coordinator_HasDelayEnterPlaymode) {
-            if (EditorApplication.isCompiling) return;
-            if (EditorApplication.isUpdating) return;
-
-            UntilExitSettings.Coordinator_HasDelayEnterPlaymode = false;
-            EditorApplication.isPlaying = true; // the amount of silent failures to domain reloads is insane
-        }
 
         /*- UI -*/
         GUILayout.BeginHorizontal("box");
