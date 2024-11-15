@@ -34,6 +34,9 @@ Additional Editors are created with Symlinks or Hard copies. We use files on dis
 ## Need Help or want to chat?
 Feel free to just drop us a line on [Discord](https://discord.gg/8y87EEaftE). It's always better to have a real conversation and we can also screenshare there. It's also not hard to reach us through our various other socials. There we can talk about about the individual needs that you might have with your multiplayer projects.
 
+</br>
+
+___
 ## Other Unity Packages
 Check out [Immediate Style](https://github.com/hopeforsenegal/com.moonlitstudios.immediatestyle) & [Asset Stripper](https://github.com/hopeforsenegal/com.moonlitstudios.assetstripper)
 
