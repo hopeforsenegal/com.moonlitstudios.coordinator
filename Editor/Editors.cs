@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Threading;
 using UnityEditor;
 using UnityEditor.Build;
@@ -162,8 +163,8 @@ public static class Editors
     public static void TestComplete()
     {
         UnityEngine.Debug.Log("<color=green>Tests Complete!</color>");
+        UntilExitSettings.Coordinator_TestState = TestStates.PostTest;
         EditorApplication.isPlaying = false;
-        UntilExitSettings.Coordinator_TestState = (int)TestStates.Off;
     }
 
     private static void BackgroundUpdate()
@@ -186,7 +187,7 @@ public static class Editors
         foreach (var message in messages) {
             if (message.type != CompilerMessageType.Error) continue;
 
-            UntilExitSettings.Coordinator_TestState = (int)TestStates.Off;
+            UntilExitSettings.Coordinator_TestState = TestStates.Off;
             UnityEngine.Debug.LogError("Compilation errors detected! Aborting Tests!"); break;
         }
     }
@@ -196,7 +197,29 @@ public static class Editors
         var playSetting = (CoordinationModes)EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
         UnityEngine.Debug.Log($"OriginalCoordinatePlaymodeStateChanged {playmodeState} {playSetting}");
         if (playSetting == CoordinationModes.Standalone) return;
-        if (playmodeState == PlayModeStateChange.ExitingPlayMode) return;
+
+        if (playmodeState == PlayModeStateChange.ExitingPlayMode) {
+            UnityEngine.Debug.Log($"UntilExitSettings.Coordinator_TestState {UntilExitSettings.Coordinator_TestState}");
+            if (UntilExitSettings.Coordinator_TestState == TestStates.PostTest) {
+                UntilExitSettings.Coordinator_TestState = TestStates.Off;
+                /////////////////
+                if (playSetting == CoordinationModes.TestAndPlaymode) {
+                    var assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
+                    foreach (var assembly in assemblies) {
+                        var types = assembly.GetTypes();
+                        foreach (var type in types) {
+                            var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                            foreach (var method in methods) {
+                                if (method.GetCustomAttribute<AfterTestAttribute>() != null) {
+                                    method.Invoke(null, null);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return;
+        }
 
         Playmode.Queue((int)playmodeState); // We queue these for later because domain reloads
     }
