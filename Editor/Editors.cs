@@ -49,6 +49,7 @@ internal static class UntilExitSettings // SessionState is cleared when Unity ex
     public static string Coordinator_CurrentGlobalScriptingDefines { get => SessionState.GetString(nameof(Coordinator_CurrentGlobalScriptingDefines), string.Empty); set => SessionState.SetString(nameof(Coordinator_CurrentGlobalScriptingDefines), value); }
     public static bool Coordinator_IsCoordinatePlayThisSessionOnAdditional { get => SessionState.GetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), value ? 1 : 0); }
     public static bool Coordinator_HasDelayEnterPlaymode { get => SessionState.GetInt(nameof(Coordinator_HasDelayEnterPlaymode), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_HasDelayEnterPlaymode), value ? 1 : 0); }
+    public static bool Coordinator_IsRunPostTest { get => SessionState.GetInt(nameof(Coordinator_IsRunPostTest), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsRunPostTest), value ? 1 : 0); }
 }
 internal class SessionStateConvenientListInt
 {
@@ -163,8 +164,10 @@ public static class Editors
     public static void TestComplete()
     {
         UnityEngine.Debug.Log("<color=green>Tests Complete!</color>");
-        UntilExitSettings.Coordinator_TestState = TestStates.PostTest;
-        EditorApplication.isPlaying = false;
+        if (!IsAdditional()) {
+            UntilExitSettings.Coordinator_TestState = TestStates.PostTest;
+            EditorApplication.isPlaying = false;
+        } // The additionals will shut off when the original sends a message to
     }
 
     private static void BackgroundUpdate()
@@ -204,18 +207,7 @@ public static class Editors
                 UntilExitSettings.Coordinator_TestState = TestStates.Off;
                 /////////////////
                 if (playSetting == CoordinationModes.TestAndPlaymode) {
-                    var assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
-                    foreach (var assembly in assemblies) {
-                        var types = assembly.GetTypes();
-                        foreach (var type in types) {
-                            var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                            foreach (var method in methods) {
-                                if (method.GetCustomAttribute<AfterTestAttribute>() != null) {
-                                    method.Invoke(null, null);
-                                }
-                            }
-                        }
-                    }
+                    UntilExitSettings.Coordinator_IsRunPostTest = true;
                 }
             }
             return;
@@ -241,9 +233,28 @@ public static class Editors
         if (UntilExitSettings.Coordinator_HasDelayEnterPlaymode) {
             if (EditorApplication.isCompiling) return;
             if (EditorApplication.isUpdating) return;
-
             UntilExitSettings.Coordinator_HasDelayEnterPlaymode = false;
+            /////////////////
             EditorApplication.isPlaying = true; // the amount of silent failures to domain reloads is insane
+        }
+
+        if (UntilExitSettings.Coordinator_IsRunPostTest) {
+            if (EditorApplication.isCompiling) return;
+            if (EditorApplication.isUpdating) return;
+            UntilExitSettings.Coordinator_IsRunPostTest = false;
+            /////////////////
+            var assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
+            foreach (var assembly in assemblies) {
+                var types = assembly.GetTypes();
+                foreach (var type in types) {
+                    var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    foreach (var method in methods) {
+                        if (method.GetCustomAttribute<AfterTestAttribute>() != null) {
+                            method.Invoke(null, null);
+                        }
+                    }
+                }
+            }
         }
 
         if (Playmode.Count() > 0) {
