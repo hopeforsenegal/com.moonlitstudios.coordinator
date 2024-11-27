@@ -16,6 +16,14 @@ public class CoordinatorWindow : EditorWindow
     [MenuItem("Moonlit/Coordinator/Coordinate", priority = 20)]
     public static void ShowWindow() => GetWindow(typeof(CoordinatorWindow));
 
+#if UNITY_EDITOR_OSX
+    public const string Browse = "Open in Finder...";
+    public const string ShowAllInDirectory = "Show Editors in Finder...";
+#else
+    public const string Browse = "Browse...";
+    public const string ShowAllInDirectory = "Show Editors Directory...";
+#endif
+
     private struct Visible
     {
         public Vector2 ScrollPosition;
@@ -41,7 +49,7 @@ public class CoordinatorWindow : EditorWindow
         public string EditorOpen;
         public string EditorClose;
         public string EditorDelete;
-        public string ShowInFinder;
+        public string BrowseFolder;
         public bool UpdateCoordinatePlay;
         public bool Settings;
         public bool Github;
@@ -192,7 +200,7 @@ public class CoordinatorWindow : EditorWindow
                             if (i != 0) EditorGUILayout.HelpBox($"{editorType}", MessageType.Info);
                             GUILayout.BeginHorizontal();
                             EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
-                            events.ShowInFinder = GUILayout.Button("Open in Finder", GUILayout.Width(170)) ? editorInfo.Path : events.ShowInFinder;
+                            events.BrowseFolder = GUILayout.Button(Browse, GUILayout.Width(170)) ? editorInfo.Path : events.BrowseFolder;
                             GUILayout.EndHorizontal();
 
                             if (i != 0) {
@@ -249,7 +257,7 @@ public class CoordinatorWindow : EditorWindow
                     }
                     if (sVisible.IsShowFoldoutNew) {
                         GUILayout.BeginVertical("box");
-                        events.ShowInFinder = GUILayout.Button("Show Editors in Finder") ? Paths.ProjectRootPath : events.ShowInFinder;
+                        events.BrowseFolder = GUILayout.Button(ShowAllInDirectory) ? Paths.ProjectRootPath : events.BrowseFolder;
                         GUILayout.BeginHorizontal();
                         events.EditorAdd = (sVisible.Path.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorType.Symlink} Editor") ? EditorType.Symlink : events.EditorAdd;
                         events.EditorAdd = (sVisible.Path.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorType.HardCopy} Editor") ? EditorType.HardCopy : events.EditorAdd;
@@ -358,9 +366,9 @@ public class CoordinatorWindow : EditorWindow
         if (!string.IsNullOrWhiteSpace(events.EditorDelete)) {
             FileUtil.DeleteFileOrDirectory(events.EditorDelete);
         }
-        if (!string.IsNullOrWhiteSpace(events.ShowInFinder)) {
-            UnityEngine.Debug.Assert(Directory.Exists(events.ShowInFinder), "Not a valid location");
-            Process.Start(events.ShowInFinder);
+        if (!string.IsNullOrWhiteSpace(events.BrowseFolder)) {
+            UnityEngine.Debug.Assert(Directory.Exists(events.BrowseFolder), "Not a valid location");
+            Process.Start(events.BrowseFolder);
         }
     }
 

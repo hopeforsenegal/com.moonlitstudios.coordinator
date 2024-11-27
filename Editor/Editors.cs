@@ -379,7 +379,14 @@ public static class Editors
 
     internal static bool IsSymlinked(string destinationPath) => File.Exists(Path.Combine(destinationPath, EditorType.Symlink.ToString()));
     internal static void MarkAsSymlink(string destinationPath) => File.WriteAllText(Path.Combine(destinationPath, EditorType.Symlink.ToString()), "");
-    internal static void Symlink(string sourcePath, string destinationPath) => ExecuteBashCommandLine($"ln -s {sourcePath.Replace(" ", "\\ ")} {destinationPath.Replace(" ", "\\ ")}");
+    internal static void Symlink(string sourcePath, string destinationPath)
+    {
+#if UNITY_EDITOR_OSX
+        ExecuteBashCommandLine($"ln -s {sourcePath.Replace(" ", "\\ ")} {destinationPath.Replace(" ", "\\ ")}");
+#else
+        Process.Start("cmd.exe", $"/C mklink /J \"{destinationPath}\" \"{sourcePath}\"");
+#endif
+    }
 
     internal static void HardCopy(string sourcePath, string destinationPath)
     {
