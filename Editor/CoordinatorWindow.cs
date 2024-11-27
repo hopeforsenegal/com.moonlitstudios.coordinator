@@ -71,7 +71,8 @@ public class CoordinatorWindow : EditorWindow
 
     public const int MaximumAmountOfEditors = 6;
     private static readonly Color DeleteRed = new Color(255 / 255f, 235 / 255f, 235 / 255f);
-    private static readonly Color TestGreen = new Color(230 / 255f, 255 / 255f, 230 / 255f);
+    private static readonly Color TestBlue = new Color(230 / 255f, 230 / 255f, 255 / 255f);
+    private static readonly Color OpenGreen = new Color(230 / 255f, 255 / 255f, 230 / 255f);
     private static readonly string[] Options = { CoordinationModes.Standalone.ToString(), CoordinationModes.Playmode.ToString(), CoordinationModes.TestAndPlaymode.ToString() };
     private static Visible sVisible;
     private static ProjectSettings sProjectSettingsInMemory;
@@ -187,8 +188,18 @@ public class CoordinatorWindow : EditorWindow
                                 GUILayout.Label(editorInfo.Name);
                             }
                             GUILayout.FlexibleSpace();
+                            if (i != 0) {
+                                using (new BackgroundColorScope(!isProcessRunningForProject ? OpenGreen : Color.red)) {
+                                    if (!isProcessRunningForProject) {
+                                        events.EditorOpen = GUILayout.Button("Open Editor", GUILayout.Width(170)) ? editorInfo.Path : events.EditorOpen;
+                                    } else {
+                                        events.EditorClose = GUILayout.Button("Close Editor", GUILayout.Width(170)) ? editorInfo.Path : events.EditorClose;
+                                    }
+                                }
+                            }
                         }
                         if (sVisible.IsShowFoldout[i]) {
+                            GUILayout.Space(10);
                             var editorType = sVisible.IsSymlinked[i] ? EditorType.Symlink : EditorType.HardCopy;
                             if (i != 0) EditorGUILayout.HelpBox($"{editorType}", MessageType.Info);
                             GUILayout.BeginHorizontal();
@@ -212,17 +223,8 @@ public class CoordinatorWindow : EditorWindow
                                 }
 
                                 GUILayout.Space(10);
+
                                 GUILayout.BeginHorizontal();
-
-                                using (new BackgroundColorScope(!isProcessRunningForProject ? TestGreen : Color.red)) {
-                                    if (!isProcessRunningForProject) {
-                                        events.EditorOpen = GUILayout.Button("Open Editor") ? editorInfo.Path : events.EditorOpen;
-                                    } else {
-                                        events.EditorClose = GUILayout.Button("Close Editor") ? editorInfo.Path : events.EditorClose;
-                                    }
-                                }
-
-                                GUILayout.EndHorizontal();
                                 var customButtonStyle = new GUIStyle(GUI.skin.button)
                                 {
                                     normal = { background = CreateColorTexture(new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },
@@ -241,6 +243,8 @@ public class CoordinatorWindow : EditorWindow
                                             "Cancel") ? editorInfo.Path : events.EditorDelete;
                                     }
                                 }
+                                GUILayout.FlexibleSpace();
+                                GUILayout.EndHorizontal();
                             }
                         }
                         GUILayout.EndVertical();
@@ -275,7 +279,7 @@ public class CoordinatorWindow : EditorWindow
                 var testState = UntilExitSettings.Coordinator_TestState;
                 using (new EditorGUILayout.VerticalScope("box")) {
                     using (new EditorGUILayout.HorizontalScope()) {
-                        using (new BackgroundColorScope(testState == TestStates.Off ? TestGreen : Color.red)) {
+                        using (new BackgroundColorScope(testState == TestStates.Off ? TestBlue : Color.red)) {
                             if (testState == TestStates.Off) {
                                 events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
                             } else {
