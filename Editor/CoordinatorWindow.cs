@@ -51,8 +51,6 @@ public class CoordinatorWindow : EditorWindow
         public string EditorDelete;
         public string BrowseFolder;
         public bool UpdateCoordinatePlay;
-        public bool Settings;
-        public bool Github;
         public bool StartTests;
         public bool StopTests;
     }
@@ -148,11 +146,6 @@ public class CoordinatorWindow : EditorWindow
         }
 
         /*- UI -*/
-        GUILayout.BeginHorizontal("box");
-        events.Settings = GUILayout.Button("Settings");
-        events.Github = GUILayout.Button("Github");
-        GUILayout.EndHorizontal();
-
         if (Editors.IsAdditional()) {
             EditorGUILayout.HelpBox("You can only launch additional editors from the original editor.", MessageType.Info);
         } else {
@@ -161,7 +154,6 @@ public class CoordinatorWindow : EditorWindow
             if (sVisible.Path != null && sVisible.Path.Length >= 2) {
                 GUILayout.BeginVertical();
                 {
-                    GUILayout.Space(20);
                     GUILayout.BeginHorizontal();
                     GUILayout.FlexibleSpace();
                     GUILayout.Label("Current Coordination Mode", EditorStyles.boldLabel);
@@ -169,8 +161,9 @@ public class CoordinatorWindow : EditorWindow
                     GUILayout.EndHorizontal();
                     sVisible.SelectedOption = GUILayout.SelectionGrid(sVisible.SelectedOption, Options, Options.Length);
                     if (sVisible.SelectedOption != previousSelection) events.UpdateCoordinatePlay = true;
-                    GUILayout.Space(10);
+                    GUILayout.Space(20);
 
+                    GUILayout.Label("Editors:", EditorStyles.boldLabel);
                     sVisible.ScrollPosition = EditorGUILayout.BeginScrollView(sVisible.ScrollPosition);
 
                     for (var i = 0; i < sVisible.Path.Length; i++) {
@@ -199,7 +192,9 @@ public class CoordinatorWindow : EditorWindow
                             var editorType = sVisible.IsSymlinked[i] ? EditorType.Symlink : EditorType.HardCopy;
                             if (i != 0) EditorGUILayout.HelpBox($"{editorType}", MessageType.Info);
                             GUILayout.BeginHorizontal();
+                            EditorGUI.BeginDisabledGroup(true);
                             EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
+                            EditorGUI.EndDisabledGroup();
                             events.BrowseFolder = GUILayout.Button(Browse, GUILayout.Width(170)) ? editorInfo.Path : events.BrowseFolder;
                             GUILayout.EndHorizontal();
 
@@ -218,12 +213,15 @@ public class CoordinatorWindow : EditorWindow
 
                                 GUILayout.Space(10);
                                 GUILayout.BeginHorizontal();
-                                EditorGUI.BeginDisabledGroup(isProcessRunningForProject);
-                                events.EditorOpen = GUILayout.Button("Open Editor") ? editorInfo.Path : events.EditorOpen;
-                                EditorGUI.EndDisabledGroup();
-                                EditorGUI.BeginDisabledGroup(!isProcessRunningForProject);
-                                events.EditorClose = GUILayout.Button("Close Editor") ? editorInfo.Path : events.EditorClose;
-                                EditorGUI.EndDisabledGroup();
+
+                                using (new BackgroundColorScope(!isProcessRunningForProject ? TestGreen : Color.red)) {
+                                    if (!isProcessRunningForProject) {
+                                        events.EditorOpen = GUILayout.Button("Open Editor") ? editorInfo.Path : events.EditorOpen;
+                                    } else {
+                                        events.EditorClose = GUILayout.Button("Close Editor") ? editorInfo.Path : events.EditorClose;
+                                    }
+                                }
+
                                 GUILayout.EndHorizontal();
                                 var customButtonStyle = new GUIStyle(GUI.skin.button)
                                 {
@@ -305,12 +303,6 @@ public class CoordinatorWindow : EditorWindow
         }
 
         /*- Handle Events -*/
-        if (events.Github) {
-            Application.OpenURL("https://github.com/hopeforsenegal/com.moonlitstudios.coordinator");
-        }
-        if (events.Settings) {
-            SettingsService.OpenProjectSettings(CoordinatorSettingsProvider.MenuLocationInProjectSettings);
-        }
         if (events.UpdateCoordinatePlay) {
             sVisible.CoordinationMode = (CoordinationModes)sVisible.SelectedOption;
             EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = sVisible.SelectedOption;
