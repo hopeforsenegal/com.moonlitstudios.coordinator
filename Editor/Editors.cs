@@ -243,7 +243,7 @@ public static class Editors
             if (EditorApplication.isUpdating) return;
             UntilExitSettings.Coordinator_IsRunPostTest = false;
             /////////////////
-            var assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             foreach (var assembly in assemblies) {
                 var types = assembly.GetTypes();
                 foreach (var type in types) {

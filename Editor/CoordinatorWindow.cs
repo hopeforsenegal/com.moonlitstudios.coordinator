@@ -31,6 +31,7 @@ public class CoordinatorWindow : EditorWindow
         public string[] Path;
         public bool[] IsShowFoldout;
         public bool[] IsSymlinked;
+        internal bool IsShowFoldoutNew;
     }
 
     private struct Events
@@ -103,8 +104,9 @@ public class CoordinatorWindow : EditorWindow
         sVisible.ScriptingDefineSymbols = new string[MaximumAmountOfEditors];
         sVisible.PreviousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
         sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
-        sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
         sVisible.IsSymlinked = new bool[MaximumAmountOfEditors];
+        sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
+        sVisible.IsShowFoldoutNew = true;
         sVisible.SelectedOption = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
     }
 
@@ -143,10 +145,11 @@ public class CoordinatorWindow : EditorWindow
         events.Github = GUILayout.Button("Github");
         GUILayout.EndHorizontal();
 
-        EditorGUI.BeginDisabledGroup(EditorApplication.isPlaying);
         if (Editors.IsAdditional()) {
             EditorGUILayout.HelpBox("You can only launch additional editors from the original editor.", MessageType.Info);
         } else {
+            EditorGUI.BeginDisabledGroup(EditorApplication.isPlaying);
+
             if (sVisible.Path != null && sVisible.Path.Length >= 2) {
                 GUILayout.BeginVertical();
                 {
@@ -159,34 +162,6 @@ public class CoordinatorWindow : EditorWindow
                     sVisible.SelectedOption = GUILayout.SelectionGrid(sVisible.SelectedOption, Options, Options.Length);
                     if (sVisible.SelectedOption != previousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(10);
-
-                    if (sVisible.CoordinationMode == CoordinationModes.TestAndPlaymode) {
-                        var testState = UntilExitSettings.Coordinator_TestState;
-                        using (new EditorGUILayout.VerticalScope("box")) {
-                            using (new EditorGUILayout.HorizontalScope()) {
-                                using (new BackgroundColorScope(testState == TestStates.Off ? TestGreen : Color.red)) {
-                                    if (testState == TestStates.Off) {
-                                        events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
-                                    } else {
-                                        using (new EnableGroupScope(true)) {
-                                            events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
-                                        }
-                                    }
-                                }
-                                GUILayout.BeginHorizontal();
-                                GUILayout.Space(30);
-                                EditorGUI.LabelField(EditorGUILayout.GetControlRect(GUILayout.Width(50)), "Status:");
-                                EditorGUILayout.HelpBox($"{testState}", MessageType.None, true);
-                                GUILayout.FlexibleSpace();
-                                GUILayout.EndHorizontal();
-                            }
-                            EditorGUILayout.LabelField("Global Scripting Define Symbols on Play [';' separated] (Note: This Overwrites! We will improve this in the future)");
-                            GUILayout.BeginHorizontal();
-                            sVisible.GlobalScriptingDefineSymbols = EditorGUILayout.TextField(sVisible.GlobalScriptingDefineSymbols, EditorStyles.textField);
-                            GUILayout.EndHorizontal();
-                        }
-                        GUILayout.Space(10);
-                    }
 
                     sVisible.ScrollPosition = EditorGUILayout.BeginScrollView(sVisible.ScrollPosition);
 
@@ -265,6 +240,24 @@ public class CoordinatorWindow : EditorWindow
                         GUILayout.EndVertical();
                     }
 
+
+                    GUILayout.BeginVertical("GroupBox");
+                    using (new EditorGUILayout.HorizontalScope()) {
+                        sVisible.IsShowFoldoutNew = EditorGUILayout.Foldout(sVisible.IsShowFoldoutNew, string.Empty, true);
+                        GUILayout.Label("Additional Editor Options");
+                        GUILayout.FlexibleSpace();
+                    }
+                    if (sVisible.IsShowFoldoutNew) {
+                        GUILayout.BeginVertical("box");
+                        events.ShowInFinder = GUILayout.Button("Show Editors in Finder") ? Paths.ProjectRootPath : events.ShowInFinder;
+                        GUILayout.BeginHorizontal();
+                        events.EditorAdd = (sVisible.Path.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorType.Symlink} Editor") ? EditorType.Symlink : events.EditorAdd;
+                        events.EditorAdd = (sVisible.Path.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorType.HardCopy} Editor") ? EditorType.HardCopy : events.EditorAdd;
+                        GUILayout.EndHorizontal();
+                        GUILayout.EndVertical();
+                    }
+                    GUILayout.EndVertical();
+
                     EditorGUILayout.EndScrollView();
                 }
                 GUILayout.EndVertical();
@@ -272,14 +265,35 @@ public class CoordinatorWindow : EditorWindow
                 EditorGUILayout.HelpBox("Nothing to coordinate with. No additional editors are available yet.", MessageType.Info);
             }
 
-            GUILayout.BeginVertical("box");
-            GUILayout.BeginHorizontal();
-            events.EditorAdd = (sVisible.Path.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorType.Symlink} Editor") ? EditorType.Symlink : events.EditorAdd;
-            events.EditorAdd = (sVisible.Path.Length < MaximumAmountOfEditors) && GUILayout.Button($"Add a {EditorType.HardCopy} Editor") ? EditorType.HardCopy : events.EditorAdd;
-            GUILayout.EndHorizontal();
+            if (sVisible.CoordinationMode == CoordinationModes.TestAndPlaymode) {
+                var testState = UntilExitSettings.Coordinator_TestState;
+                using (new EditorGUILayout.VerticalScope("box")) {
+                    using (new EditorGUILayout.HorizontalScope()) {
+                        using (new BackgroundColorScope(testState == TestStates.Off ? TestGreen : Color.red)) {
+                            if (testState == TestStates.Off) {
+                                events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
+                            } else {
+                                using (new EnableGroupScope(true)) {
+                                    events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
+                                }
+                            }
+                        }
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Space(30);
+                        EditorGUI.LabelField(EditorGUILayout.GetControlRect(GUILayout.Width(50)), "Status:");
+                        EditorGUILayout.HelpBox($"{testState}", MessageType.None, true);
+                        GUILayout.FlexibleSpace();
+                        GUILayout.EndHorizontal();
+                    }
+                    EditorGUILayout.LabelField("Global Scripting Define Symbols on Play [';' separated] (Note: This Overwrites! We will improve this in the future)");
+                    GUILayout.BeginHorizontal();
+                    sVisible.GlobalScriptingDefineSymbols = EditorGUILayout.TextField(sVisible.GlobalScriptingDefineSymbols, EditorStyles.textField);
+                    GUILayout.EndHorizontal();
+                }
+                GUILayout.Space(10);
+            }
+
             EditorGUI.EndDisabledGroup();
-            events.ShowInFinder = GUILayout.Button("Show Editors in Finder") ? Paths.ProjectRootPath : events.ShowInFinder;
-            GUILayout.EndVertical();
         }
 
         /*- Handle Events -*/
