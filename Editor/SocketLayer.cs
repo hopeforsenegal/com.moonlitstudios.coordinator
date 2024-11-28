@@ -19,20 +19,17 @@ public static class SocketLayer
             sRefreshInterval = .5f; // Refresh every half second
 
             if (ReceivedMessage.Count != 0) {
-                string messageToProcess = string.Empty, endPointToProcess = string.Empty;
                 foreach (var path in ReceivedMessage) {
-                    if (File.Exists(path.Key)) {
-                        var message = File.ReadAllText(path.Key);
-                        if (!string.IsNullOrEmpty(message)) {
-                            messageToProcess = message;
-                            endPointToProcess = path.Key;
-                            break;
-                        }
-                    }
-                }
-                if (!string.IsNullOrWhiteSpace(messageToProcess) && !string.IsNullOrWhiteSpace(endPointToProcess)) {
+                    if (!File.Exists(path.Key)) continue;
+                    var message = File.ReadAllText(path.Key);
+                    if (string.IsNullOrEmpty(message)) continue;
+                    var ourPath = path.Key.Substring(0, path.Key.Length - 1);
+
+                    var messageToProcess = message;
+                    var endPointToProcess = ourPath;
                     ReceivedMessage[endPointToProcess] = messageToProcess;
-                    File.WriteAllText(endPointToProcess, string.Empty);
+                    File.WriteAllText(path.Key, string.Empty);
+                    break;
                 }
             }
         }
@@ -40,7 +37,8 @@ public static class SocketLayer
 
     public static void OpenListenerOnFile(string path)
     {
-        Debug.Log($"{nameof(OpenListenerOnFile)} [{path}]");
+        var ourPath = path.Substring(0, path.Length - 1);
+        Debug.Log($"{nameof(OpenListenerOnFile)} [{path}->{ourPath}]");
         ReceivedMessage[path] = string.Empty;
     }
 

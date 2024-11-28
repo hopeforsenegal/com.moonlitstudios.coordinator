@@ -18,9 +18,23 @@ internal static class CommandLineParams
 {
     public static string Additional { get; } = "--additional";
     public static string Original { get; } = "-original";
+    public static string Port { get; } = "-port";
+    private static string BuildPortParam(string port) => $"{Port} {port}";
     private static string OriginalProcessID { get; } = $"{Original} {Process.GetCurrentProcess().Id}";
 
-    public static string AdditionalEditorParams { get; } = string.Join(" ", Additional, OriginalProcessID);
+    public static string BuildAdditionalEditorParams(string port) => string.Join(" ", Additional, OriginalProcessID, BuildPortParam(port));
+
+    public static string ParsePort(string commandLine)
+    {
+        var index = commandLine.IndexOf(Port) + Port.Length;
+        var remain = commandLine.Substring(index).Trim().Split(" ");
+        return remain[0];
+    }
+}
+internal static class Paths
+{
+    public static string ProjectPath { get; } = Application.dataPath.Replace("/Assets", "");
+    public static string ProjectRootPath { get; } = Path.GetFullPath(Path.Combine(ProjectPath, ".."));
 }
 internal static class MessageEndpoint
 {
@@ -31,11 +45,6 @@ internal static class Messages
 {
     public const string Edit = nameof(Edit);
     internal static string Play(string[] scriptingDefineSymbols) => $"{nameof(Play)}|{string.Join(":", scriptingDefineSymbols)}";
-}
-internal static class Paths
-{
-    public static string ProjectPath { get; } = Application.dataPath.Replace("/Assets", "");
-    public static string ProjectRootPath { get; } = Path.GetFullPath(Path.Combine(ProjectPath, ".."));
 }
 internal static class EditorUserSettings
 {
@@ -136,17 +145,20 @@ public static class Editors
             var path = SceneManager.GetActiveScene().path;
             if (!string.IsNullOrWhiteSpace(path)) {
                 UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(SceneManager.GetActiveScene().name));
-                SocketLayer.WriteMessage(MessageEndpoint.Scene, path);
+                for (int i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
+                    SocketLayer.WriteMessage($"{MessageEndpoint.Scene}{i}", path);
+                }
             }
             EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged;
             EditorApplication.update += OriginalUpdate;
             CompilationPipeline.assemblyCompilationFinished += OriginalOnCompilationFinished;
         } else {
+            var port = CommandLineParams.ParsePort(Environment.CommandLine);
             UnityEngine.Debug.Log("Is Additional. " +
                 $"\nCommand Line [{Environment.CommandLine}] " +
                 $"\nCurrent Scripting Defines [{PlayerSettings.GetScriptingDefineSymbols(BuildTarget)}]");
-            SocketLayer.OpenListenerOnFile(MessageEndpoint.Playmode);
-            SocketLayer.OpenListenerOnFile(MessageEndpoint.Scene);
+            SocketLayer.OpenListenerOnFile($"{MessageEndpoint.Playmode}{port}");
+            SocketLayer.OpenListenerOnFile($"{MessageEndpoint.Scene}{port}");
             var args = Environment.GetCommandLineArgs();
             for (var i = 0; i < args.Length; i++) {
                 var arg = args[i];
@@ -199,7 +211,7 @@ public static class Editors
     {
         var playSetting = (CoordinationModes)EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
         UnityEngine.Debug.Log($"OriginalCoordinatePlaymodeStateChanged {playmodeState} {playSetting}");
-        if (playSetting == CoordinationModes.Standalone) return;
+        if (playSetting == CoordinationModes.Standalone) return; // This is what prevents us writing out to our sockets on Playmode and TestAndPlaymode
 
         if (playmodeState == PlayModeStateChange.ExitingPlayMode) {
             UnityEngine.Debug.Log($"UntilExitSettings.Coordinator_TestState {UntilExitSettings.Coordinator_TestState}");
@@ -218,13 +230,14 @@ public static class Editors
 
     private static void AdditionalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
-        if (playmodeState == PlayModeStateChange.ExitingPlayMode && UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional) {
-            var ok = EditorUtility.DisplayDialog("Coordinated Play", "Playmode was started from the Original Editor. Please exit playmode from the Original Editor.", "OK", "Exit Playmode");
-            if (ok) {
-                EditorApplication.isPlaying = true;
-            } else {
-                UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false;
-            }
+        if (playmodeState != PlayModeStateChange.ExitingPlayMode) return;
+        if (!UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional) return;
+
+        var ok = EditorUtility.DisplayDialog("Coordinated Play", "Playmode was started from the Original Editor. Please exit playmode from the Original Editor.", "OK", "Exit Playmode");
+        if (ok) {
+            EditorApplication.isPlaying = true;
+        } else {
+            UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false;
         }
     }
 
@@ -266,16 +279,18 @@ public static class Editors
                         var scriptingDefines = new string[CoordinatorWindow.MaximumAmountOfEditors];
                         for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
                             scriptingDefines[i] = PlayerSettings.GetScriptingDefineSymbols(BuildTarget) + ";" + settings.scriptingDefineSymbols[i];
+                            SocketLayer.WriteMessage($"{MessageEndpoint.Playmode}{i}", Messages.Play(scriptingDefines));
                         }
-                        SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Play(scriptingDefines));
                     }
                     break;
                 case PlayModeStateChange.EnteredEditMode: {
-                        SocketLayer.WriteMessage(MessageEndpoint.Playmode, Messages.Edit);
+                        for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
+                            SocketLayer.WriteMessage($"{MessageEndpoint.Playmode}{i}", Messages.Edit);
+                        }
                     }
                     break;
                 case PlayModeStateChange.ExitingEditMode: break; // ignore
-                case PlayModeStateChange.ExitingPlayMode: break;// ignore
+                case PlayModeStateChange.ExitingPlayMode: break; // ignore
                 default: throw new ArgumentOutOfRangeException();// ignore
             }
         }
@@ -306,57 +321,57 @@ public static class Editors
 
         foreach (var r in SocketLayer.ReceivedMessage) {
             var (endpoint, message) = (r.Key, r.Value);
-            if (!string.IsNullOrWhiteSpace(message)) {
-                EndPointsToProcess.Add(endpoint);
-                UnityEngine.Debug.Log($"We consumed message '{message}'");
-                if (endpoint == MessageEndpoint.Playmode) {
-                    var split = message.Split("|");
-                    var messageType = split[0];
-                    var forAdditionalOne = string.Empty;
-                    if (split.Length == 2) {
-                        var scriptingDefinesForAllEditors = split[1];
-                        var scriptingDefinesSplit = scriptingDefinesForAllEditors.Split(':');
-                        forAdditionalOne = scriptingDefinesSplit[1];
-                        UnityEngine.Debug.Assert(scriptingDefinesSplit.Length == CoordinatorWindow.MaximumAmountOfEditors, $"Scripting defines should always be {CoordinatorWindow.MaximumAmountOfEditors} and not {scriptingDefinesSplit.Length}");
-                        UnityEngine.Debug.Log($"Updating Additional Scripting Defines '{scriptingDefinesForAllEditors}' " +
-                            $"\n+ [{forAdditionalOne}]'. Then doing asset database refresh.");
-                    }
+            if (string.IsNullOrWhiteSpace(message)) continue;
 
-                    if (messageType == nameof(Messages.Play)) {
-                        UnityEngine.Debug.Assert(split.Length == 2);
-                        UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true;
-                        UntilExitSettings.Coordinator_HasDelayEnterPlaymode = true;
-
-                        foreach (var group in (BuildTargetGroup[])Enum.GetValues(typeof(BuildTargetGroup))) {
-                            if (group == BuildTargetGroup.Unknown) continue;
-
-                            try { PlayerSettings.SetScriptingDefineSymbolsForGroup(group, forAdditionalOne); }
-                            catch (ArgumentException) { }
-                        }
-                    }
-                    if (messageType == nameof(Messages.Edit)) {
-                        UnityEngine.Debug.Assert(split.Length == 1);
-                        UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false;
-                        EditorApplication.isPlaying = false;
-                    }
-
-                    EditorApplication.delayCall += () =>
-                    {   // This logic is just to focus the window so we go into playmode
-                        var sceneView = SceneView.lastActiveSceneView;
-                        if (sceneView == null) sceneView = EditorWindow.CreateWindow<SceneView>();
-                        sceneView.Show();
-                        sceneView.Focus();
-                    };
-
-                    AssetDatabase.Refresh();
+            EndPointsToProcess.Add(endpoint);
+            UnityEngine.Debug.Log($"We consumed message '{message}' on {endpoint}");
+            if (endpoint == MessageEndpoint.Playmode) {
+                var split = message.Split("|");
+                var messageType = split[0];
+                var forAdditionalOne = string.Empty;
+                if (split.Length == 2) {
+                    var scriptingDefinesForAllEditors = split[1];
+                    var scriptingDefinesSplit = scriptingDefinesForAllEditors.Split(':');
+                    forAdditionalOne = scriptingDefinesSplit[1];
+                    UnityEngine.Debug.Assert(scriptingDefinesSplit.Length == CoordinatorWindow.MaximumAmountOfEditors, $"Scripting defines should always be {CoordinatorWindow.MaximumAmountOfEditors} and not {scriptingDefinesSplit.Length}");
+                    UnityEngine.Debug.Log($"Updating Additional Scripting Defines '{scriptingDefinesForAllEditors}' " +
+                        $"\n+ [{forAdditionalOne}]'. Then doing asset database refresh.");
                 }
-                if (endpoint == MessageEndpoint.Scene) {
-                    if (SceneManager.GetActiveScene().path != message) {
-                        if (Application.isPlaying) {
-                            SceneManager.LoadScene(message);
-                        } else {
-                            EditorSceneManager.OpenScene(message);
-                        }
+
+                if (messageType == nameof(Messages.Play)) {
+                    UnityEngine.Debug.Assert(split.Length == 2);
+                    UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = true;
+                    UntilExitSettings.Coordinator_HasDelayEnterPlaymode = true;
+
+                    foreach (var group in (BuildTargetGroup[])Enum.GetValues(typeof(BuildTargetGroup))) {
+                        if (group == BuildTargetGroup.Unknown) continue;
+
+                        try { PlayerSettings.SetScriptingDefineSymbolsForGroup(group, forAdditionalOne); }
+                        catch (ArgumentException) { }
+                    }
+                }
+                if (messageType == nameof(Messages.Edit)) {
+                    UnityEngine.Debug.Assert(split.Length == 1);
+                    UntilExitSettings.Coordinator_IsCoordinatePlayThisSessionOnAdditional = false;
+                    EditorApplication.isPlaying = false;
+                }
+
+                EditorApplication.delayCall += () =>
+                {   // This logic is just to focus the window so we go into playmode
+                    var sceneView = SceneView.lastActiveSceneView;
+                    if (sceneView == null) sceneView = EditorWindow.CreateWindow<SceneView>();
+                    sceneView.Show();
+                    sceneView.Focus();
+                };
+
+                AssetDatabase.Refresh();
+            }
+            if (endpoint == MessageEndpoint.Scene) {
+                if (SceneManager.GetActiveScene().path != message) {
+                    if (Application.isPlaying) {
+                        SceneManager.LoadScene(message);
+                    } else {
+                        EditorSceneManager.OpenScene(message);
                     }
                 }
             }
@@ -403,12 +418,6 @@ public static class Editors
         }
     }
 
-    internal static bool IsProcessAlive(int processId)
-    {
-        try { return !Process.GetProcessById(processId).HasExited; }
-        catch (ArgumentException) { return false; } // this should suffice unless we throw ArgumentException for multiple reasons
-    }
-
     private static void ExecuteBashCommandLine(string command)
     {
         using (var proc = new Process
@@ -431,5 +440,11 @@ public static class Editors
                 UnityEngine.Debug.LogError(proc.StandardError.ReadToEnd());
             }
         }
+    }
+
+    internal static bool IsProcessAlive(int processId)
+    {
+        try { return !Process.GetProcessById(processId).HasExited; }
+        catch (ArgumentException) { return false; } // this should suffice unless we throw ArgumentException for multiple reasons
     }
 }

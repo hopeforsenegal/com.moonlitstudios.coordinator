@@ -225,6 +225,7 @@ public class CoordinatorWindow : EditorWindow
                                 GUILayout.Space(10);
 
                                 GUILayout.BeginHorizontal();
+                                EditorGUI.BeginDisabledGroup(true);
                                 var customButtonStyle = new GUIStyle(GUI.skin.button)
                                 {
                                     normal = { background = CreateColorTexture(new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },
@@ -243,6 +244,7 @@ public class CoordinatorWindow : EditorWindow
                                             "Cancel") ? editorInfo.Path : events.EditorDelete;
                                     }
                                 }
+                                EditorGUI.EndDisabledGroup();
                                 GUILayout.FlexibleSpace();
                                 GUILayout.EndHorizontal();
                             }
@@ -343,7 +345,7 @@ public class CoordinatorWindow : EditorWindow
         }
         if (!string.IsNullOrWhiteSpace(events.EditorOpen)) {
             UnityEngine.Debug.Assert(Directory.Exists(events.EditorOpen), "No Editor at location");
-            var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.AdditionalEditorParams} {sVisible.CommandLineParams[events.Index]}");
+            var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.BuildAdditionalEditorParams(events.Index.ToString())} {sVisible.CommandLineParams[events.Index]}");
             var processIds = new List<PathToProcessId>(sVisible.PathToProcessIds);
             processIds.Add(new PathToProcessId { Path = events.EditorOpen, ProcessID = process.Id });
             UntilExitSettings.Coordinator_ProjectPathToChildProcessID = PathToProcessId.Join(processIds.ToArray());
