@@ -359,7 +359,8 @@ public class CoordinatorWindow : EditorWindow
             var pathToProcessIds = sVisible.PathToProcessIds;
             foreach (var p in pathToProcessIds) {
                 if (p.Path == events.EditorClose) {
-                    Process.GetProcessById(p.ProcessID).Kill(); // Is calling Kill() twice bad? Probably not so we don't need to update local memory
+                    try { Process.GetProcessById(p.ProcessID).Kill(); }// Is calling Kill() twice bad? Probably not so we don't need to update local memory
+                    catch (InvalidOperationException) { }
                     break;
                 }
             }

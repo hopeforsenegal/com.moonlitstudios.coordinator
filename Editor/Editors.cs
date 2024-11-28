@@ -316,11 +316,10 @@ public static class Editors
         } else {
             sRefreshInterval = .5f; // Refresh every half second
 
-            if (int.TryParse(UntilExitSettings.Coordinator_ParentProcessID, out var processId)) {
-                if (!IsProcessAlive(processId)) {
-                    UnityEngine.Debug.Log($"The original '{UntilExitSettings.Coordinator_ParentProcessID}' closed so we should close ourselves");
-                    Process.GetCurrentProcess().Kill();
-                }
+            var isParentProcessDead = int.TryParse(UntilExitSettings.Coordinator_ParentProcessID, out var processId) && !IsProcessAlive(processId);
+            if (isParentProcessDead) {
+                UnityEngine.Debug.Log($"The original '{UntilExitSettings.Coordinator_ParentProcessID}' closed so we should close ourselves");
+                Process.GetCurrentProcess().Kill();
             }
         }
 
