@@ -21,7 +21,7 @@ public class CoordinatorWindow : EditorWindow
     public const string ShowAllInDirectory = "Show Editors in Finder...";
 #else
     public const string Browse = "Browse...";
-    public const string ShowAllInDirectory = "Show Editors Directory...";
+    public const string ShowAllInDirectory = "Show Editors in File Explorer...";
 #endif
 
     private struct Visible
@@ -152,7 +152,7 @@ public class CoordinatorWindow : EditorWindow
         } else {
             EditorGUI.BeginDisabledGroup(EditorApplication.isPlaying);
 
-            if (sVisible.Path != null && sVisible.Path.Length >= 2) {
+            if (sVisible.Path != null && sVisible.Path.Length >= 1) {
                 GUILayout.BeginVertical();
                 {
                     GUILayout.BeginHorizontal();
@@ -344,7 +344,11 @@ public class CoordinatorWindow : EditorWindow
         }
         if (!string.IsNullOrWhiteSpace(events.EditorOpen)) {
             UnityEngine.Debug.Assert(Directory.Exists(events.EditorOpen), "No Editor at location");
+#if UNITY_EDITOR_OSX
             var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.BuildAdditionalEditorParams(events.Index.ToString())} {sVisible.CommandLineParams[events.Index]}");
+#else
+            var process = Process.Start($"{EditorApplication.applicationPath}", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.BuildAdditionalEditorParams(events.Index.ToString())} {sVisible.CommandLineParams[events.Index]}");
+#endif
             var processIds = new List<PathToProcessId>(sVisible.PathToProcessIds);
             processIds.Add(new PathToProcessId { Path = events.EditorOpen, ProcessID = process.Id });
             UntilExitSettings.Coordinator_ProjectPathToChildProcessID = PathToProcessId.Join(processIds.ToArray());
@@ -361,7 +365,11 @@ public class CoordinatorWindow : EditorWindow
             }
         }
         if (!string.IsNullOrWhiteSpace(events.EditorDelete)) {
+#if UNITY_EDITOR_OSX
             FileUtil.DeleteFileOrDirectory(events.EditorDelete);
+#else
+            Process.Start("cmd.exe", $"/c rmdir /s/q \"{events.EditorDelete}\"");
+#endif
         }
         if (!string.IsNullOrWhiteSpace(events.BrowseFolder)) {
             UnityEngine.Debug.Assert(Directory.Exists(events.BrowseFolder), "Not a valid location");
@@ -384,6 +392,7 @@ public class CoordinatorWindow : EditorWindow
     private static void SaveProjectSettings()
     {
         if (sVisible.ScriptingDefineSymbols == null) return;
+        if (sProjectSettingsInMemory == null) return;
 
         var scriptingDefineCounts = 0;
         foreach (var item in sVisible.ScriptingDefineSymbols) {

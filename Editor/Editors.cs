@@ -34,6 +34,12 @@ internal static class Paths
 {
     public static string ProjectPath { get; } = Application.dataPath.Replace("/Assets", "");
     public static string ProjectRootPath { get; } = Path.GetFullPath(Path.Combine(ProjectPath, ".."));
+    public static string GetProjectName()
+    {
+        string[] s = Application.dataPath.Split('/');
+        string projectName = s[s.Length - 2];
+        return projectName;
+    }
 }
 internal static class MessageEndpoint
 {
@@ -384,8 +390,10 @@ public static class Editors
     public static string[] GetEditorsAvailable()
     {
         var editorsAvailable = new List<string>();
+        var projectName = Paths.GetProjectName();
         foreach (var dir in Directory.EnumerateDirectories(Paths.ProjectRootPath)) {
             if (dir.Contains(".git")) continue;
+            if (!dir.Contains(projectName)) continue;
             editorsAvailable.Add(dir);
         }
         return editorsAvailable.ToArray();
