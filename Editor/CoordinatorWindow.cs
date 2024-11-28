@@ -213,7 +213,6 @@ public class CoordinatorWindow : EditorWindow
                                 EditorGUI.BeginDisabledGroup(isProcessRunningForProject);
                                 EditorGUILayout.LabelField("Command Line Params");
                                 sVisible.CommandLineParams[i] = EditorGUILayout.TextField(sVisible.CommandLineParams[i], EditorStyles.textField);
-                                EditorGUI.EndDisabledGroup();
 
                                 if (sVisible.CoordinationMode != CoordinationModes.Standalone) {
                                     EditorGUILayout.LabelField("Scripting Define Symbols on Play [';' separated] (Note: This Overwrites! We will improve this in the future)");
@@ -225,7 +224,6 @@ public class CoordinatorWindow : EditorWindow
                                 GUILayout.Space(10);
 
                                 GUILayout.BeginHorizontal();
-                                EditorGUI.BeginDisabledGroup(isProcessRunningForProject);
                                 var customButtonStyle = new GUIStyle(GUI.skin.button)
                                 {
                                     normal = { background = CreateColorTexture(new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },
@@ -244,9 +242,10 @@ public class CoordinatorWindow : EditorWindow
                                             "Cancel") ? editorInfo.Path : events.EditorDelete;
                                     }
                                 }
-                                EditorGUI.EndDisabledGroup();
+
                                 GUILayout.FlexibleSpace();
                                 GUILayout.EndHorizontal();
+                                EditorGUI.EndDisabledGroup();
                             }
                         }
                         GUILayout.EndVertical();
