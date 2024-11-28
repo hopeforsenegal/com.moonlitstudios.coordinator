@@ -191,9 +191,9 @@ public class CoordinatorWindow : EditorWindow
                             if (i != 0) {
                                 using (new BackgroundColorScope(!isProcessRunningForProject ? OpenGreen : Color.red)) {
                                     if (!isProcessRunningForProject) {
-                                        events.EditorOpen = GUILayout.Button("Open Editor", GUILayout.Width(170)) ? editorInfo.Path : events.EditorOpen;
+                                        events.EditorOpen = GUILayout.Button("Open Editor", GUILayout.Width(180), GUILayout.Height(30)) ? editorInfo.Path : events.EditorOpen;
                                     } else {
-                                        events.EditorClose = GUILayout.Button("Close Editor", GUILayout.Width(170)) ? editorInfo.Path : events.EditorClose;
+                                        events.EditorClose = GUILayout.Button("Close Editor", GUILayout.Width(180), GUILayout.Height(30)) ? editorInfo.Path : events.EditorClose;
                                     }
                                 }
                             }
@@ -225,7 +225,7 @@ public class CoordinatorWindow : EditorWindow
                                 GUILayout.Space(10);
 
                                 GUILayout.BeginHorizontal();
-                                EditorGUI.BeginDisabledGroup(true);
+                                EditorGUI.BeginDisabledGroup(isProcessRunningForProject);
                                 var customButtonStyle = new GUIStyle(GUI.skin.button)
                                 {
                                     normal = { background = CreateColorTexture(new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },

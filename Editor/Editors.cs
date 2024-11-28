@@ -18,18 +18,17 @@ internal static class CommandLineParams
 {
     public static string Additional { get; } = "--additional";
     public static string Original { get; } = "-original";
+    private static string OriginalProcessID { get; } = $"{Original} {Process.GetCurrentProcess().Id}";
     public static string Port { get; } = "-port";
     private static string BuildPortParam(string port) => $"{Port} {port}";
-    private static string OriginalProcessID { get; } = $"{Original} {Process.GetCurrentProcess().Id}";
-
-    public static string BuildAdditionalEditorParams(string port) => string.Join(" ", Additional, OriginalProcessID, BuildPortParam(port));
-
     public static string ParsePort(string commandLine)
     {
         var index = commandLine.IndexOf(Port) + Port.Length;
         var remain = commandLine.Substring(index).Trim().Split(" ");
         return remain[0];
     }
+
+    public static string BuildAdditionalEditorParams(string port) => string.Join(" ", Additional, OriginalProcessID, BuildPortParam(port));
 }
 internal static class Paths
 {
@@ -179,7 +178,7 @@ public static class Editors
         if (!IsAdditional()) {
             UntilExitSettings.Coordinator_TestState = TestStates.PostTest;
             EditorApplication.isPlaying = false;
-        } // The additionals will shut off when the original sends a message to
+        } // The additionals will shut off when the original sends a message to them
     }
 
     private static void BackgroundUpdate()
