@@ -327,8 +327,9 @@ public class CoordinatorWindow : EditorWindow
             UntilExitSettings.Coordinator_TestState = TestStates.Off;
         }
         if (events.EditorAdd != default) {
+            var next = sVisible.Path == null ? 0 : sVisible.Path.Length;
             var original = EditorPaths.PopulateEditorInfo(Paths.ProjectPath);
-            var additional = EditorPaths.PopulateEditorInfo($"{Paths.ProjectPath}Copy");
+            var additional = EditorPaths.PopulateEditorInfo($"{Paths.ProjectPath}Copy{next}");
 
             Directory.CreateDirectory(additional.Path);
             if (events.EditorAdd == EditorType.Symlink) {
