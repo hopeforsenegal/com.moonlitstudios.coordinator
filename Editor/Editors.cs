@@ -12,8 +12,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 internal enum EditorType { Symlink = 1, HardCopy }
-internal enum CoordinationModes { Standalone, Playmode, TestAndPlaymode }
-internal enum TestStates { Off, Testing, PostTest }
+internal enum EditorStates { AllEditorsClosed, AnEditorsOpen, EditorsPlaymode, RunningPostTest }
 internal static class CommandLineParams
 {
     public static string Additional { get; } = "--additional";
@@ -36,8 +35,8 @@ internal static class Paths
     public static string ProjectRootPath { get; } = Path.GetFullPath(Path.Combine(ProjectPath, ".."));
     public static string GetProjectName()
     {
-        string[] s = Application.dataPath.Split('/');
-        string projectName = s[s.Length - 2];
+        var s = Application.dataPath.Split('/');
+        var projectName = s[s.Length - 2];
         return projectName;
     }
 }
@@ -57,12 +56,13 @@ internal static class EditorUserSettings
 }
 internal static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
 {
-    public static TestStates Coordinator_TestState { get => (TestStates)SessionState.GetInt(nameof(Coordinator_TestState), 0); set => SessionState.SetInt(nameof(Coordinator_TestState), (int)value); }
+    public static EditorStates Coordinator_TestState { get => (EditorStates)SessionState.GetInt(nameof(Coordinator_TestState), 0); set => SessionState.SetInt(nameof(Coordinator_TestState), (int)value); }
     public static string Coordinator_ParentProcessID { get => SessionState.GetString(nameof(Coordinator_ParentProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ParentProcessID), value); }
     public static string Coordinator_ProjectPathToChildProcessID { get => SessionState.GetString(nameof(Coordinator_ProjectPathToChildProcessID), string.Empty); set => SessionState.SetString(nameof(Coordinator_ProjectPathToChildProcessID), value); }
     public static string Coordinator_CurrentGlobalScriptingDefines { get => SessionState.GetString(nameof(Coordinator_CurrentGlobalScriptingDefines), string.Empty); set => SessionState.SetString(nameof(Coordinator_CurrentGlobalScriptingDefines), value); }
     public static bool Coordinator_IsCoordinatePlayThisSessionOnAdditional { get => SessionState.GetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), value ? 1 : 0); }
     public static bool Coordinator_HasDelayEnterPlaymode { get => SessionState.GetInt(nameof(Coordinator_HasDelayEnterPlaymode), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_HasDelayEnterPlaymode), value ? 1 : 0); }
+    public static bool Coordinator_HasTestsSetToRun { get => SessionState.GetInt(nameof(Coordinator_HasTestsSetToRun), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_HasTestsSetToRun), value ? 1 : 0); }
     public static bool Coordinator_IsRunPostTest { get => SessionState.GetInt(nameof(Coordinator_IsRunPostTest), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsRunPostTest), value ? 1 : 0); }
 }
 internal class SessionStateConvenientListInt
@@ -150,7 +150,7 @@ public static class Editors
             var path = SceneManager.GetActiveScene().path;
             if (!string.IsNullOrWhiteSpace(path)) {
                 UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(SceneManager.GetActiveScene().name));
-                for (int i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
+                for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
                     SocketLayer.WriteMessage($"{MessageEndpoint.Scene}{i}", path);
                 }
             }
@@ -182,10 +182,10 @@ public static class Editors
     {
         UnityEngine.Debug.Log("<color=green>Tests Complete!</color>");
         if (!IsAdditional()) {
-            UntilExitSettings.Coordinator_TestState = TestStates.PostTest;
+            UntilExitSettings.Coordinator_TestState = EditorStates.RunningPostTest;
             EditorApplication.isPlaying = false;
-        } // The additionals will shut off when the original sends a message to them
-    }
+        } // The additional editors will shut off when the original sends a message to them
+    }// Runs the Post Test step after leaving Playmode because of domain reload and Editor availability
 
     private static void BackgroundUpdate()
     {
@@ -202,28 +202,51 @@ public static class Editors
 
     private static void OriginalOnCompilationFinished(string assemblyPath, CompilerMessage[] messages)
     {
-        if (UntilExitSettings.Coordinator_TestState != TestStates.Testing) return;
+        if (UntilExitSettings.Coordinator_TestState == EditorStates.EditorsPlaymode) return;
+        if (UntilExitSettings.Coordinator_TestState == EditorStates.RunningPostTest) return;
 
+        var editorPaths = GetEditorsAvailable();
+        var hasAnyProcessRunning = false;
+
+        // Check to see what state we are in. Editors might be open or closed.
+        if (editorPaths != null && editorPaths.Length >= 1) {
+            var pathToProcessIds = PathToProcessId.Split(UntilExitSettings.Coordinator_ProjectPathToChildProcessID);
+            var updatedListOfProcesses = new List<PathToProcessId>();
+            foreach (var p in pathToProcessIds) {
+                if (IsProcessAlive(p.ProcessID)) {
+                    updatedListOfProcesses.Add(p);
+                }
+            }
+            foreach (var editor in editorPaths) {
+                var editorInfo = EditorPaths.PopulateEditorInfo(editor);
+                foreach (var p in updatedListOfProcesses) {
+                    if (p.Path == editorInfo.Path) {
+                        hasAnyProcessRunning = true;
+                    }
+                }
+            }
+        }
         foreach (var message in messages) {
             if (message.type != CompilerMessageType.Error) continue;
 
-            UntilExitSettings.Coordinator_TestState = TestStates.Off;
+            UntilExitSettings.Coordinator_TestState = hasAnyProcessRunning ? EditorStates.AnEditorsOpen : EditorStates.AllEditorsClosed;
             UnityEngine.Debug.LogError("Compilation errors detected! Aborting Tests!"); break;
         }
     }
 
     private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
-        var playSetting = (CoordinationModes)EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
+        var playSetting = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
         UnityEngine.Debug.Log($"OriginalCoordinatePlaymodeStateChanged {playmodeState} {playSetting}");
-        if (playSetting == CoordinationModes.Standalone) return; // This is what prevents us writing out to our sockets on Playmode and TestAndPlaymode
+        if (playSetting == 0) return; // This is what prevents us writing out to our sockets on Playmode and TestAndPlaymode
 
         if (playmodeState == PlayModeStateChange.ExitingPlayMode) {
             UnityEngine.Debug.Log($"UntilExitSettings.Coordinator_TestState {UntilExitSettings.Coordinator_TestState}");
-            if (UntilExitSettings.Coordinator_TestState == TestStates.PostTest) {
-                UntilExitSettings.Coordinator_TestState = TestStates.Off;
+            if (UntilExitSettings.Coordinator_TestState == EditorStates.RunningPostTest) {
+                UntilExitSettings.Coordinator_TestState = EditorStates.AnEditorsOpen; // Editors have to be open to be in post test
                 /////////////////
-                if (playSetting == CoordinationModes.TestAndPlaymode) {
+                if (UntilExitSettings.Coordinator_HasTestsSetToRun) {
+                    UntilExitSettings.Coordinator_HasTestsSetToRun = false;
                     UntilExitSettings.Coordinator_IsRunPostTest = true;
                 }
             }
@@ -286,14 +309,14 @@ public static class Editors
                             scriptingDefines[i] = PlayerSettings.GetScriptingDefineSymbols(BuildTarget) + ";" + settings.scriptingDefineSymbols[i];
                             SocketLayer.WriteMessage($"{MessageEndpoint.Playmode}{i}", Messages.Play(scriptingDefines));
                         }
+                        break;
                     }
-                    break;
                 case PlayModeStateChange.EnteredEditMode: {
                         for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
                             SocketLayer.WriteMessage($"{MessageEndpoint.Playmode}{i}", Messages.Edit);
                         }
+                        break;
                     }
-                    break;
                 case PlayModeStateChange.ExitingEditMode: break; // ignore
                 case PlayModeStateChange.ExitingPlayMode: break; // ignore
                 default: throw new ArgumentOutOfRangeException();// ignore
