@@ -110,7 +110,6 @@ public class CoordinatorWindow : EditorWindow
         for (var i = 0; i < MaximumAmountOfEditors; i++) sVisible.IsShowFoldout[i] = true;
 
         EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
-        EditorApplication.update += OnUpdate;
     }
 
     private static void InitializeVisibleMemory()
@@ -122,11 +121,6 @@ public class CoordinatorWindow : EditorWindow
         sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
         sVisible.IsShowFoldoutNew = true;
         sVisible.IsCoordinateToggled = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1;
-    }
-
-    private void OnUpdate()
-    {
-        if (hasFocus) { Repaint(); }
     }
 
     private bool RenderCoordinationMode()
@@ -454,13 +448,22 @@ public class CoordinatorWindow : EditorWindow
         }
     }
 
+    protected void OnFocus()
+    {
+        EditorApplication.update += OnUpdate;
+    }
+
     protected void OnLostFocus()
     {
+        EditorApplication.update -= OnUpdate;
+
         if (Editors.IsAdditional()) return;
         if (!sVisible.IsDirty) return;
         sVisible.IsDirty = false;
         SaveProjectSettings();
     }
+
+    private void OnUpdate() { Repaint(); }
 
     private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
