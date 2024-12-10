@@ -138,9 +138,10 @@ internal struct EditorPaths
 [InitializeOnLoad] // Without being in a InitializeOnLoad, the EnteredPlaymode event will get dropped in OriginalCoordinatePlaymodeStateChanged. We also cannot put that functionality in a EditorWindow/CoordinatorWindow
 public static class Editors
 {
-    private static float sRefreshInterval;
     private static readonly List<string> EndPointsToProcess = new List<string>();
     private static readonly SessionStateConvenientListInt Playmode = new SessionStateConvenientListInt(nameof(Playmode));
+    private static float sRefreshInterval;
+    public static bool HasCompilationError; // can live temporarily since we check every domain reload/compilation anyways
     public static NamedBuildTarget BuildTarget { get; } = NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone);
 
     static Editors()
@@ -229,8 +230,8 @@ public static class Editors
         foreach (var message in messages) {
             if (message.type != CompilerMessageType.Error) continue;
 
-            UntilExitSettings.Coordinator_TestState = hasAnyProcessRunning ? EditorStates.AnEditorsOpen : EditorStates.AllEditorsClosed;
-            UnityEngine.Debug.LogError("Compilation errors detected! Aborting Tests!"); break;
+            UnityEngine.Debug.LogError("Compilation errors detected! Unable to go into Playmode or run Tests!");
+            HasCompilationError = true; break;
         }
     }
 

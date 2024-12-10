@@ -42,6 +42,7 @@ public class CoordinatorWindow : EditorWindow
         public bool IsDirty;
         public int NumberOfProcessRunning;
         public float TogglePosition;
+        public float RepaintStartTime;
     }
 
     private struct Events
@@ -135,7 +136,7 @@ public class CoordinatorWindow : EditorWindow
             GUILayout.Space(20);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            (sVisible.IsCoordinateToggled, sVisible.TogglePosition) = TwoSwitchToggle(sVisible.IsCoordinateToggled, sVisible.TogglePosition);
+            (sVisible.IsCoordinateToggled, sVisible.TogglePosition) = TwoSwitchToggle(sVisible.IsCoordinateToggled, sVisible.TogglePosition, ref sVisible.RepaintStartTime);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.EndHorizontal();
@@ -146,7 +147,7 @@ public class CoordinatorWindow : EditorWindow
         return sVisible.IsCoordinateToggled;
     }
 
-    private static (bool, float) TwoSwitchToggle(bool isToggled, float togglePosition)
+    private static (bool, float) TwoSwitchToggle(bool isToggled, float togglePosition, ref float repaintStartTime)
     {
         Rect toggleRect;
         using (new BackgroundColorScope(isToggled ? TestBlue : Color.white)) {
@@ -155,7 +156,11 @@ public class CoordinatorWindow : EditorWindow
 
             if (GUI.Button(toggleRect, "")) {
                 isToggled = !isToggled;
+                repaintStartTime = Time.time;
             }
+        }
+        if (Time.time - repaintStartTime < 2f) {
+            GUI.changed = true;
         }
 
         togglePosition = Mathf.Lerp(togglePosition, isToggled ? ToggleWidth - ToggleHeight : 0, ToggleSpeed); // Calculate the position of the sliding part
@@ -339,7 +344,7 @@ public class CoordinatorWindow : EditorWindow
                 var testState = UntilExitSettings.Coordinator_TestState;
                 var hasAppearTestable = testState == EditorStates.AnEditorsOpen || testState == EditorStates.AllEditorsClosed;
                 using (new EditorGUILayout.VerticalScope("box")) {
-                    using (new EnableGroupScope(sVisible.NumberOfProcessRunning > 0))
+                    using (new EnableGroupScope(sVisible.NumberOfProcessRunning > 0 && !Editors.HasCompilationError))
                     using (new EditorGUILayout.HorizontalScope())
                     using (new BackgroundColorScope(hasAppearTestable ? TestBlue : Color.red)) {
                         events.StartPlaymode = GUILayout.Button("Run Playmode", GUILayout.Width(200));
@@ -448,22 +453,13 @@ public class CoordinatorWindow : EditorWindow
         }
     }
 
-    protected void OnFocus()
-    {
-        EditorApplication.update += OnUpdate;
-    }
-
     protected void OnLostFocus()
     {
-        EditorApplication.update -= OnUpdate;
-
         if (Editors.IsAdditional()) return;
         if (!sVisible.IsDirty) return;
         sVisible.IsDirty = false;
         SaveProjectSettings();
     }
-
-    private void OnUpdate() { Repaint(); }
 
     private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
