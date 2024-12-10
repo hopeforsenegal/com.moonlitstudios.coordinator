@@ -7,7 +7,7 @@
 
 ## Features
 
-* **Standalone** interact with your [symlinked](https://en.wikipedia.org/wiki/Symbolic_link) or hard copy editors manually as if you created them and opened them yourself. Symlinked Editors have the benefit of reflecting script changes to both projeccts.
+* **Standalone** interact with your [symlinked](https://en.wikipedia.org/wiki/Symbolic_link) or hard copy editors manually as if you created them and opened them yourself. Symlinked Editors have the benefit of reflecting script changes across the Main Editor and other symlinked projects.
 * **Playmode** your additional editors will go into playmode when the original main editor goes into playmode. Perfect for getting into a multiplayer game with fewer steps. 
 * **TestAndPlaymode** is the solution to be even less hands on. The editors will go into playmode until the main editor calls ```Editors.TestComplete``` and then call a post test method for you (perfect for going through a set of tests and then uploading a build).
 * **Scripting Defines** so you can have one Editor run as **Server** and the other as **Client** (or perhaps **Demo**).
