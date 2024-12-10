@@ -12,6 +12,13 @@
         "coordinate",
         "easy"
     ],
+  "samples": [
+	{
+		"displayName": "Test",
+		"description": "A simple project showing off the bare minimum test",
+		"path": "Test~"
+	}
+  ],
     "author": {
         "name": "Moonlit Studios",
         "url": "https://moonlitstudios.us/"
