@@ -212,9 +212,12 @@ public class CoordinatorWindow : EditorWindow
                     if (isToggled != previousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(5);
                     EditorGUI.LabelField(EditorGUILayout.GetControlRect(GUILayout.Width(50)), "Status:", EditorStyles.boldLabel);
-                    if (sVisible.NumberOfProcessRunning == 0 && UntilExitSettings.Coordinator_TestState == EditorStates.AnEditorsOpen) UnityEngine.Debug.LogWarning("Might want to investigate this!");
+                    if (sVisible.NumberOfProcessRunning == 0 && UntilExitSettings.Coordinator_TestState == EditorStates.AnEditorsOpen) {
+                        UnityEngine.Debug.LogWarning("Might want to investigate this!");
+                    }
                     var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open", EditorStates.EditorsPlaymode => "All Editors are in Playmode", EditorStates.RunningPostTest => "Running Post Test methods", };
-                    EditorGUILayout.HelpBox(statusMessage, MessageType.None, true);
+                    if (EditorUtility.scriptCompilationFailed) statusMessage = "Compilation errors detected! Unable to go into Playmode or run Tests!";
+                    EditorGUILayout.HelpBox(statusMessage, EditorUtility.scriptCompilationFailed ? MessageType.Error : MessageType.None, true);
 
                     GUILayout.Space(10);
                     GUILayout.Label("Editors:", EditorStyles.boldLabel);
@@ -345,7 +348,7 @@ public class CoordinatorWindow : EditorWindow
                 var testState = UntilExitSettings.Coordinator_TestState;
                 var hasAppearTestable = testState == EditorStates.AnEditorsOpen || testState == EditorStates.AllEditorsClosed;
                 using (new EditorGUILayout.VerticalScope("box")) {
-                    using (new EnableGroupScope(sVisible.NumberOfProcessRunning > 0 && !Editors.HasCompilationError))
+                    using (new EnableGroupScope(sVisible.NumberOfProcessRunning > 0 && !EditorUtility.scriptCompilationFailed))
                     using (new EditorGUILayout.HorizontalScope())
                     using (new BackgroundColorScope(hasAppearTestable ? TestBlue : Color.red)) {
                         events.StartPlaymode = GUILayout.Button("Run Playmode", GUILayout.Width(200));

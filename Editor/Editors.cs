@@ -141,7 +141,6 @@ public static class Editors
     private static readonly List<string> EndPointsToProcess = new List<string>();
     private static readonly SessionStateConvenientListInt Playmode = new SessionStateConvenientListInt(nameof(Playmode));
     private static float sRefreshInterval;
-    public static bool HasCompilationError; // can live temporarily since we check every domain reload/compilation anyways
     public static NamedBuildTarget BuildTarget { get; } = NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone);
 
     static Editors()
@@ -157,7 +156,6 @@ public static class Editors
             }
             EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged;
             EditorApplication.update += OriginalUpdate;
-            CompilationPipeline.assemblyCompilationFinished += OriginalOnCompilationFinished;
         } else {
             var port = CommandLineParams.ParsePort(Environment.CommandLine);
             UnityEngine.Debug.Log("Is Additional. " +
@@ -199,40 +197,6 @@ public static class Editors
             Thread.Sleep(1000);
         }
         // ReSharper disable once FunctionNeverReturns
-    }
-
-    private static void OriginalOnCompilationFinished(string assemblyPath, CompilerMessage[] messages)
-    {
-        if (UntilExitSettings.Coordinator_TestState == EditorStates.EditorsPlaymode) return;
-        if (UntilExitSettings.Coordinator_TestState == EditorStates.RunningPostTest) return;
-
-        var editorPaths = GetEditorsAvailable();
-        var hasAnyProcessRunning = false;
-
-        // Check to see what state we are in. Editors might be open or closed.
-        if (editorPaths != null && editorPaths.Length >= 1) {
-            var pathToProcessIds = PathToProcessId.Split(UntilExitSettings.Coordinator_ProjectPathToChildProcessID);
-            var updatedListOfProcesses = new List<PathToProcessId>();
-            foreach (var p in pathToProcessIds) {
-                if (IsProcessAlive(p.ProcessID)) {
-                    updatedListOfProcesses.Add(p);
-                }
-            }
-            foreach (var editor in editorPaths) {
-                var editorInfo = EditorPaths.PopulateEditorInfo(editor);
-                foreach (var p in updatedListOfProcesses) {
-                    if (p.Path == editorInfo.Path) {
-                        hasAnyProcessRunning = true;
-                    }
-                }
-            }
-        }
-        foreach (var message in messages) {
-            if (message.type != CompilerMessageType.Error) continue;
-
-            UnityEngine.Debug.LogError("Compilation errors detected! Unable to go into Playmode or run Tests!");
-            HasCompilationError = true; break;
-        }
     }
 
     private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
