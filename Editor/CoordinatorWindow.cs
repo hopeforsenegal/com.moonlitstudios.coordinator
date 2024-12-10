@@ -440,7 +440,9 @@ public class CoordinatorWindow : EditorWindow
                     break;
                 }
             }
-            UntilExitSettings.Coordinator_TestState = sVisible.NumberOfProcessRunning == 1 && hasKilled? EditorStates.AllEditorsClosed: EditorStates.AnEditorsOpen;
+            if (sVisible.NumberOfProcessRunning == 0 && hasKilled) UnityEngine.Debug.LogWarning("Might want to investigate this!");
+
+            UntilExitSettings.Coordinator_TestState = sVisible.NumberOfProcessRunning == 1 && hasKilled ? EditorStates.AllEditorsClosed : EditorStates.AnEditorsOpen;
         }
         if (!string.IsNullOrWhiteSpace(events.EditorDelete)) {
             sVisible.IsDirty = true;
