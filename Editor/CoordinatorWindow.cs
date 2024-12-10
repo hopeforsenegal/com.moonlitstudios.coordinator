@@ -424,19 +424,23 @@ public class CoordinatorWindow : EditorWindow
             var processIds = new List<PathToProcessId>(sVisible.PathToProcessIds);
             processIds.Add(new PathToProcessId { Path = events.EditorOpen, ProcessID = process.Id });
             UntilExitSettings.Coordinator_ProjectPathToChildProcessID = PathToProcessId.Join(processIds.ToArray());
+            UntilExitSettings.Coordinator_TestState = EditorStates.AnEditorsOpen;
             sVisible.PathToProcessIds = processIds.ToArray();
             SaveProjectSettings();
         }
         if (!string.IsNullOrWhiteSpace(events.EditorClose)) {
             sVisible.IsDirty = true;
             var pathToProcessIds = sVisible.PathToProcessIds;
+            var hasKilled = false;
             foreach (var p in pathToProcessIds) {
                 if (p.Path == events.EditorClose) {
                     try { Process.GetProcessById(p.ProcessID).Kill(); }// Is calling Kill() twice bad? Probably not so we don't need to update local memory
                     catch (InvalidOperationException) { }
+                    hasKilled = true;
                     break;
                 }
             }
+            UntilExitSettings.Coordinator_TestState = sVisible.NumberOfProcessRunning == 1 && hasKilled? EditorStates.AllEditorsClosed: EditorStates.AnEditorsOpen;
         }
         if (!string.IsNullOrWhiteSpace(events.EditorDelete)) {
             sVisible.IsDirty = true;
