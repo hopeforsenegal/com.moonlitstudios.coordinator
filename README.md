@@ -28,6 +28,11 @@
 None of that working? **Honestly, just reach out us!** (Links & methods towards the bottom).
 
 
+## Examples
+https://github.com/hopeforsenegal/com.moonlitstudios.coordinator/blob/38f6aa3adc2beb64eb2c19e765a502b73efb6788/Test~/Test.cs#L8-L20
+
+https://github.com/hopeforsenegal/com.moonlitstudios.coordinator/blob/38f6aa3adc2beb64eb2c19e765a502b73efb6788/Test~/Test.cs#L35-L39
+
 ## How does it work?
 Additional Editors are created with [Symlinks](https://en.wikipedia.org/wiki/Symbolic_link) or Hard copies. We use files on disk that allow each editor to communicate with each other (easier then rolling a socket solution or more elaborate interprocess communication... also benefits from surviving Domain Reloads). That's 90% of how it works.
 
