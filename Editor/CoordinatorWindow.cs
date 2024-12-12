@@ -291,17 +291,17 @@ public class CoordinatorWindow : EditorWindow
                                 GUILayout.Space(10);
 
                                 GUILayout.BeginHorizontal();
-                                var customButtonStyle = new GUIStyle(GUI.skin.button)
+                                var deleteButtonStyle = new GUIStyle(GUI.skin.button)
                                 {
-                                    normal = { background = CreateColorTexture(new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },
-                                    active = { background = CreateColorTexture(new Color(0.1f, 0.1f, 0.1f)), textColor = Color.white },
+                                    normal = { background = CreateColorTexture(ref colorTextureA, new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },
+                                    active = { background = CreateColorTexture(ref colorTextureB, new Color(0.1f, 0.1f, 0.1f)), textColor = Color.white },
                                     hover = { textColor = Color.white },
                                     fontSize = 12,
                                     padding = new RectOffset(10, 10, 5, 5),
                                     margin = new RectOffset(2, 2, 2, 2),
                                 };
                                 using (new BackgroundColorScope(DeleteRed)) {
-                                    if (GUILayout.Button("Delete Editor", customButtonStyle)) {
+                                    if (GUILayout.Button("Delete Editor", deleteButtonStyle)) {
                                         var message = editorType == EditorType.Symlink ? "Are you sure you want to delete this editor?" : "Are you sure you want to delete this editor? All files will be permanently lost!";
                                         events.EditorDelete = EditorUtility.DisplayDialog(
                                             "Delete this editor?",
@@ -509,11 +509,30 @@ public class CoordinatorWindow : EditorWindow
         EditorUtility.SetDirty(sProjectSettingsInMemory);
     }
 
-    private static Texture2D CreateColorTexture(Color color)
+    private static Texture2D colorTextureA;
+    private static Texture2D colorTextureB;
+
+    private static Texture2D CreateColorTexture(ref Texture2D colorTexture, Color color)
     {
-        var texture = new Texture2D(1, 1);
-        texture.SetPixel(0, 0, color);
-        texture.Apply();
-        return texture;
+        if (colorTexture == null) {
+            colorTexture = new Texture2D(1, 1);
+        }
+        colorTexture.SetPixel(0, 0, color);
+        colorTexture.Apply();
+        return colorTexture;
+    }
+
+    private static void DestroyColorTexture(ref Texture2D colorTexture)
+    {
+        if (colorTexture != null) {
+            DestroyImmediate(colorTexture);
+            colorTexture = null;
+        }
+    }
+
+    private void OnDisable()
+    {
+        DestroyColorTexture(ref colorTextureA);
+        DestroyColorTexture(ref colorTextureB);
     }
 }
