@@ -38,6 +38,7 @@ internal static class Paths
         var projectName = s[s.Length - 2];
         return projectName;
     }
+    public const string AdditionalProjectSpecifier = "Coord";
 }
 internal static class MessageEndpoint
 {
@@ -379,7 +380,9 @@ public static class Editors
         var projectName = Paths.GetProjectName();
         foreach (var dir in Directory.EnumerateDirectories(Paths.ProjectRootPath)) {
             if (dir.Contains(".git")) continue;
-            if (!dir.Contains(projectName)) continue;
+            var lastFolderInPatch = Path.GetFileName(dir);
+            if (lastFolderInPatch != projectName && !dir.Contains(Paths.AdditionalProjectSpecifier)) continue;
+
             editorsAvailable.Add(dir);
         }
         return editorsAvailable.ToArray();

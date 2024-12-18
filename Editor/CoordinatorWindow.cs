@@ -398,7 +398,7 @@ public class CoordinatorWindow : EditorWindow
                 EditorGUILayout.HelpBox("Nothing to coordinate with. No additional editors are available yet.", MessageType.Info);
             }
 
-            if (sVisible.SelectedIndex == 1) {
+            if (sVisible.Path != null && sVisible.Path.Length >= 1 && sVisible.SelectedIndex == 1) {
                 var testState = UntilExitSettings.Coordinator_TestState;
                 var hasAppearTestable = testState == EditorStates.AnEditorsOpen || testState == EditorStates.AllEditorsClosed;
                 using (new EditorGUILayout.VerticalScope("box")) {
@@ -457,7 +457,7 @@ public class CoordinatorWindow : EditorWindow
             sVisible.IsDirty = true;
             var next = sVisible.Path == null ? 0 : sVisible.Path.Length;
             var original = EditorPaths.PopulateEditorInfo(Paths.ProjectPath);
-            var additional = EditorPaths.PopulateEditorInfo($"{Paths.ProjectPath}Copy{next}");
+            var additional = EditorPaths.PopulateEditorInfo($"{Paths.ProjectPath}{Paths.AdditionalProjectSpecifier}{next}");
 
             Directory.CreateDirectory(additional.Path);
             if (events.EditorAdd == EditorType.Symlink) {
