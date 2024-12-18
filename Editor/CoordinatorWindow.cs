@@ -17,11 +17,11 @@ public class CoordinatorWindow : EditorWindow
     public static void ShowWindow() => GetWindow(typeof(CoordinatorWindow));
 
 #if UNITY_EDITOR_OSX
-    public const string Browse = "Open in Finder...";
-    public const string ShowAllInDirectory = "Show Editors in Finder...";
+    private const string Browse = "Open in Finder...";
+    private const string ShowAllInDirectory = "Show Editors in Finder...";
 #else
-    public const string Browse = "Browse...";
-    public const string ShowAllInDirectory = "Show Editors in File Explorer...";
+    private const string Browse = "Browse...";
+    private const string ShowAllInDirectory = "Show Editors in File Explorer...";
 #endif
 
     private struct Visible
@@ -38,11 +38,9 @@ public class CoordinatorWindow : EditorWindow
         public bool[] IsShowFoldout;
         public bool[] IsSymlinked;
         public bool IsShowFoldoutNew;
-        public bool IsCoordinateToggled;
         public bool IsDirty;
         public int NumberOfProcessRunning;
-        public float TogglePosition;
-        public float RepaintStartTime;
+        public int SelectedIndex;
     }
 
     private struct Events
@@ -75,15 +73,17 @@ public class CoordinatorWindow : EditorWindow
 
     public const int MaximumAmountOfEditors = 6;
 
-    private const float ToggleSpeed = 0.075f;
-    private const float ToggleWidth = 60f;
-    private const float ToggleHeight = 30f;
-
     private static readonly Color DeleteRed = new Color(255 / 255f, 235 / 255f, 235 / 255f);
     private static readonly Color TestBlue = new Color(230 / 255f, 230 / 255f, 255 / 255f);
     private static readonly Color OpenGreen = new Color(230 / 255f, 255 / 255f, 230 / 255f);
+    private static readonly Color CoolGray = new Color(200 / 255f, 200 / 255f, 200 / 255f);
     private static Visible sVisible;
     private static ProjectSettings sProjectSettingsInMemory;
+    private static GUIStyle sRadioButtonStyleBlue;
+    private static GUIStyle sRadioButtonStyleGreen;
+    private static GUIStyle sLabelStyle;
+    private static Texture2D sColorTextureA;
+    private static Texture2D sColorTextureB;
 
     protected void CreateGUI()
     {
@@ -113,6 +113,23 @@ public class CoordinatorWindow : EditorWindow
         EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
     }
 
+    private static void RadioButton(int index, ref int selectedIndex, string name)
+    {
+        GUILayout.BeginHorizontal();
+        var isSelected = (selectedIndex == index);
+        if (GUILayout.Toggle(isSelected, "", index == 0 ? sRadioButtonStyleBlue : sRadioButtonStyleGreen, GUILayout.Width(20), GUILayout.Height(20))) {
+            selectedIndex = index;
+        }
+        GUILayout.Space(10);
+
+        GUILayout.BeginVertical();
+        GUILayout.Space(-1);
+        GUILayout.Label(name, sLabelStyle);
+        GUILayout.EndVertical();
+
+        GUILayout.EndHorizontal();
+    }
+
     private static void InitializeVisibleMemory()
     {
         sVisible.ScriptingDefineSymbols = new string[MaximumAmountOfEditors];
@@ -121,10 +138,54 @@ public class CoordinatorWindow : EditorWindow
         sVisible.IsSymlinked = new bool[MaximumAmountOfEditors];
         sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
         sVisible.IsShowFoldoutNew = true;
-        sVisible.IsCoordinateToggled = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1;
+        sVisible.SelectedIndex = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
     }
 
-    private bool RenderCoordinationMode()
+    private static Texture2D CreateRadioButtonTexture(int size, Color outlineColor, Color fillColor)
+    {
+        var texture = new Texture2D(size, size, TextureFormat.RGBA64, false) { filterMode = FilterMode.Bilinear };
+        var center = size / 2f;
+        var outerRadius = size / 2f - 1f;
+        var innerRadius = outerRadius - 2f; // 2px thick outline
+
+        for (var y = 0; y < size; y++) {
+            for (var x = 0; x < size; x++) {
+                var distanceFromCenter = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(center, center));
+
+                if (distanceFromCenter <= outerRadius) {
+                    var t = Mathf.Clamp01((distanceFromCenter - innerRadius) / 2f);
+                    var pixelColor = distanceFromCenter <= innerRadius
+                        ? fillColor
+                        : Color.Lerp(fillColor, outlineColor, t);
+
+                    // Apply anti-aliasing to the edges
+                    var alpha = 1f - Mathf.Clamp01(distanceFromCenter - outerRadius);
+                    pixelColor.a *= alpha;
+
+                    texture.SetPixel(x, y, pixelColor);
+                } else {
+                    texture.SetPixel(x, y, Color.clear);
+                }
+            }
+        }
+
+        texture.Apply();
+        return texture;
+    }
+
+    private static void InitializeStyles()
+    {
+        sRadioButtonStyleBlue = new GUIStyle();
+        sRadioButtonStyleBlue.normal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), Color.gray);
+        sRadioButtonStyleBlue.onNormal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), new Color(0.2f, 0.6f, 0.9f));
+        sRadioButtonStyleGreen = new GUIStyle();
+        sRadioButtonStyleGreen.normal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), Color.gray);
+        sRadioButtonStyleGreen.onNormal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), new Color(0.2f, 0.9f, 0.6f));
+
+        sLabelStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, normal = { textColor = CoolGray } };
+    }
+
+    private static int RenderCoordinationMode()
     {
         GUILayout.BeginHorizontal("box");
         GUILayout.FlexibleSpace();
@@ -136,7 +197,11 @@ public class CoordinatorWindow : EditorWindow
             GUILayout.Space(20);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            (sVisible.IsCoordinateToggled, sVisible.TogglePosition) = TwoSwitchToggle(sVisible.IsCoordinateToggled, sVisible.TogglePosition, ref sVisible.RepaintStartTime);
+            GUILayout.BeginVertical();
+            GUILayout.Space(20);
+            RadioButton(0, ref sVisible.SelectedIndex, "Standalone");
+            RadioButton(1, ref sVisible.SelectedIndex, "Coordinate Playmode");
+            GUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.EndHorizontal();
@@ -144,30 +209,7 @@ public class CoordinatorWindow : EditorWindow
 
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
-        return sVisible.IsCoordinateToggled;
-    }
-
-    private static (bool, float) TwoSwitchToggle(bool isToggled, float togglePosition, ref float repaintStartTime)
-    {
-        Rect toggleRect;
-        using (new BackgroundColorScope(isToggled ? TestBlue : Color.white)) {
-            GUILayout.Box("", GUILayout.Width(ToggleWidth), GUILayout.Height(ToggleHeight));
-            toggleRect = GUILayoutUtility.GetLastRect();
-
-            if (GUI.Button(toggleRect, "")) {
-                isToggled = !isToggled;
-                repaintStartTime = Time.time;
-            }
-        }
-        if (Time.time - repaintStartTime < 2f) {
-            GUI.changed = true;
-        }
-
-        togglePosition = Mathf.Lerp(togglePosition, isToggled ? ToggleWidth - ToggleHeight : 0, ToggleSpeed); // Calculate the position of the sliding part
-
-        GUI.Box(new Rect(toggleRect.x + togglePosition, toggleRect.y, ToggleHeight, ToggleHeight), "");
-        GUI.Label(new Rect(toggleRect.x + 80, toggleRect.y, 150, 30), isToggled ? "Coordinate Playmode" : "Standalone");
-        return (isToggled, togglePosition);
+        return sVisible.SelectedIndex;
     }
 
     protected void OnGUI()
@@ -198,6 +240,10 @@ public class CoordinatorWindow : EditorWindow
             }
         }
 
+        if (sRadioButtonStyleBlue == null) {
+            InitializeStyles();
+        }
+
         /*- UI -*/
         if (Editors.IsAdditional()) {
             EditorGUILayout.HelpBox("You can only launch additional editors from the original editor.", MessageType.Info);
@@ -207,7 +253,7 @@ public class CoordinatorWindow : EditorWindow
             if (sVisible.Path != null && sVisible.Path.Length >= 1) {
                 GUILayout.BeginVertical();
                 {
-                    var previousSelection = sVisible.IsCoordinateToggled;
+                    var previousSelection = sVisible.SelectedIndex;
                     var isToggled = RenderCoordinationMode();
                     if (isToggled != previousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(5);
@@ -215,7 +261,7 @@ public class CoordinatorWindow : EditorWindow
                     if (sVisible.NumberOfProcessRunning == 0 && UntilExitSettings.Coordinator_TestState == EditorStates.AnEditorsOpen) {
                         UnityEngine.Debug.LogWarning("Might want to investigate this!");
                     }
-                    var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open", EditorStates.EditorsPlaymode => "All Editors are in Playmode", EditorStates.RunningPostTest => "Running Post Test methods", };
+                    var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open", EditorStates.EditorsPlaymode => "All Editors are in Playmode", EditorStates.RunningPostTest => "Running Post Test methods" };
                     if (EditorUtility.scriptCompilationFailed) statusMessage = "Compilation errors detected! Unable to go into Playmode or run Tests!";
                     EditorGUILayout.HelpBox(statusMessage, EditorUtility.scriptCompilationFailed ? MessageType.Error : MessageType.None, true);
 
@@ -276,7 +322,7 @@ public class CoordinatorWindow : EditorWindow
                                 EditorGUILayout.LabelField("Command Line Params");
                                 sVisible.CommandLineParams[i] = EditorGUILayout.TextField(sVisible.CommandLineParams[i], EditorStyles.textField);
 
-                                if (sVisible.IsCoordinateToggled) {
+                                if (sVisible.SelectedIndex == 1) {
                                     EditorGUILayout.LabelField("Scripting Define Symbols on Play [';' separated] (Note: This Overwrites! We will improve this in the future)");
                                     GUILayout.BeginHorizontal();
                                     var previousScriptingDefineSymbols = sVisible.ScriptingDefineSymbols[i];
@@ -293,8 +339,8 @@ public class CoordinatorWindow : EditorWindow
                                 GUILayout.BeginHorizontal();
                                 var deleteButtonStyle = new GUIStyle(GUI.skin.button)
                                 {
-                                    normal = { background = CreateColorTexture(ref colorTextureA, new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },
-                                    active = { background = CreateColorTexture(ref colorTextureB, new Color(0.1f, 0.1f, 0.1f)), textColor = Color.white },
+                                    normal = { background = CreateColorTexture(ref sColorTextureA, new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },
+                                    active = { background = CreateColorTexture(ref sColorTextureB, new Color(0.1f, 0.1f, 0.1f)), textColor = Color.white },
                                     hover = { textColor = Color.white },
                                     fontSize = 12,
                                     padding = new RectOffset(10, 10, 5, 5),
@@ -344,7 +390,7 @@ public class CoordinatorWindow : EditorWindow
                 EditorGUILayout.HelpBox("Nothing to coordinate with. No additional editors are available yet.", MessageType.Info);
             }
 
-            if (sVisible.IsCoordinateToggled) {
+            if (sVisible.SelectedIndex == 1) {
                 var testState = UntilExitSettings.Coordinator_TestState;
                 var hasAppearTestable = testState == EditorStates.AnEditorsOpen || testState == EditorStates.AllEditorsClosed;
                 using (new EditorGUILayout.VerticalScope("box")) {
@@ -380,7 +426,7 @@ public class CoordinatorWindow : EditorWindow
         /*- Handle Events -*/
         if (events.UpdateCoordinatePlay) {
             sVisible.IsDirty = true;
-            EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = sVisible.IsCoordinateToggled ? 1 : 0;
+            EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = sVisible.SelectedIndex;
         }
         if (events.StartTests || events.StartPlaymode) {
             sVisible.IsDirty = true;
@@ -509,9 +555,6 @@ public class CoordinatorWindow : EditorWindow
         EditorUtility.SetDirty(sProjectSettingsInMemory);
     }
 
-    private static Texture2D colorTextureA;
-    private static Texture2D colorTextureB;
-
     private static Texture2D CreateColorTexture(ref Texture2D colorTexture, Color color)
     {
         if (colorTexture == null) {
@@ -532,7 +575,7 @@ public class CoordinatorWindow : EditorWindow
 
     private void OnDisable()
     {
-        DestroyColorTexture(ref colorTextureA);
-        DestroyColorTexture(ref colorTextureB);
+        DestroyColorTexture(ref sColorTextureA);
+        DestroyColorTexture(ref sColorTextureB);
     }
 }
