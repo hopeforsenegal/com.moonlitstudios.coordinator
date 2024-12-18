@@ -113,10 +113,10 @@ public class CoordinatorWindow : EditorWindow
         EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
     }
 
-    private static void RadioButton(int index, ref int selectedIndex, string name)
+    private static Rect RadioButton(int index, ref int selectedIndex, string name)
     {
-        GUILayout.BeginHorizontal();
-        var isSelected = (selectedIndex == index);
+        var controlRect = EditorGUILayout.BeginHorizontal();
+        var isSelected = selectedIndex == index;
         if (GUILayout.Toggle(isSelected, "", index == 0 ? sRadioButtonStyleBlue : sRadioButtonStyleGreen, GUILayout.Width(20), GUILayout.Height(20))) {
             selectedIndex = index;
         }
@@ -127,7 +127,8 @@ public class CoordinatorWindow : EditorWindow
         GUILayout.Label(name, sLabelStyle);
         GUILayout.EndVertical();
 
-        GUILayout.EndHorizontal();
+        EditorGUILayout.EndHorizontal();
+        return controlRect;
     }
 
     private static void InitializeVisibleMemory()
@@ -199,8 +200,15 @@ public class CoordinatorWindow : EditorWindow
             GUILayout.BeginHorizontal();
             GUILayout.BeginVertical();
             GUILayout.Space(20);
-            RadioButton(0, ref sVisible.SelectedIndex, "Standalone");
-            RadioButton(1, ref sVisible.SelectedIndex, "Coordinate Playmode");
+            var rectTop = RadioButton(0, ref sVisible.SelectedIndex, "Standalone");
+            var rectBottom = RadioButton(1, ref sVisible.SelectedIndex, "Coordinate Playmode");
+
+            if (rectTop.Contains(Event.current.mousePosition)) {
+                GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y - 50, 400, 40), "Interact with your editors manually as if you created them and opened them yourself", EditorStyles.helpBox);
+            }
+            if (rectBottom.Contains(Event.current.mousePosition)) {
+                GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 400, 40), "Your additional editors will go into playmode when the original main editor goes into playmode", EditorStyles.helpBox);
+            }
             GUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
