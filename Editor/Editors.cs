@@ -42,8 +42,8 @@ internal static class Paths
 }
 internal static class MessageEndpoint
 {
-    public static string Playmode { get; } = Path.Combine(Paths.ProjectRootPath, nameof(PlayModeStateChange));
-    public static string Scene { get; } = Path.Combine(Paths.ProjectRootPath, nameof(UnityEngine.SceneManagement.Scene));
+    public static string Playmode { get; } = Path.Combine(Paths.ProjectRootPath, $".{nameof(PlayModeStateChange)}");
+    public static string Scene { get; } = Path.Combine(Paths.ProjectRootPath, $".{nameof(UnityEngine.SceneManagement.Scene)}");
 }
 internal static class Messages
 {
