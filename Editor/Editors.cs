@@ -14,7 +14,7 @@ internal enum EditorType { Symlink = 1, HardCopy }
 internal enum EditorStates { AllEditorsClosed, AnEditorsOpen }
 internal static class CommandLineParams
 {
-    public static string Additional { get; } = "--additional";
+    public static string Additional { get; } = "--additional"; // We could specify which editor we are... but you could also use command line or scripting defines for this. If this is not true let us know.
     public static string Original { get; } = "-original";
     private static string OriginalProcessID { get; } = $"{Original} {Process.GetCurrentProcess().Id}";
     private static string Port { get; } = "-port";
@@ -251,14 +251,11 @@ public static class Editors
 
     public static MethodInfo[] AfterPlayMethods()
     {
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
         var afterPlayMethods = new List<MethodInfo>();
-        foreach (var assembly in assemblies) {
-            var types = assembly.GetTypes();
-            foreach (var type in types) {
-                var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                foreach (var method in methods) {
-                    if (method.GetCustomAttribute<AfterPlaymodeAttribute>() != null) {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
+            foreach (var type in assembly.GetTypes()) {
+                foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)) {
+                    if (method.GetCustomAttribute<AfterPlaymodeEndedAttribute>() != null) {
                         afterPlayMethods.Add(method);
                     }
                 }

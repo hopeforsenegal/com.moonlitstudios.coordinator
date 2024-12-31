@@ -318,7 +318,7 @@ public class CoordinatorWindow : EditorWindow
                 var testState = UntilExitSettings.Coordinator_TestState;
                 var hasAppearTestable = testState == EditorStates.AnEditorsOpen || testState == EditorStates.AllEditorsClosed;
                 using (new EditorGUILayout.VerticalScope("box")) {
-                    using (new EnableGroupScope(sVisible.NumberOfProcessRunning > 0 && !EditorUtility.scriptCompilationFailed && !EditorApplication.isPlaying))
+                    using (new EnableGroupScope(!EditorUtility.scriptCompilationFailed && !EditorApplication.isPlaying))
                     using (new EditorGUILayout.VerticalScope())
                     using (new BackgroundColorScope(hasAppearTestable ? TestBlue : Color.red)) {
                         if (hasAppearTestable) {
@@ -327,7 +327,7 @@ public class CoordinatorWindow : EditorWindow
                             if (previous != sVisible.PlaymodeWillEnd) events.HasClickedToggle = true;
 
                             previous = sVisible.AfterPlaymodeEnded;
-                            sVisible.AfterPlaymodeEnded = GUILayout.Toggle(sVisible.AfterPlaymodeEnded, $"AfterPlaymodeEnded | (Run Attribute [AfterPlaymodeEnded] on {sVisible.NumAttributeMethods} method(s) after leaving playmode and domain reload so that a user might upload to a server or create a build)", GUILayout.Width(900));
+                            sVisible.AfterPlaymodeEnded = GUILayout.Toggle(sVisible.AfterPlaymodeEnded, $"AfterPlaymodeEnded | (Run Attribute [AfterPlaymodeEnded] on {sVisible.NumAttributeMethods} method(s) after leaving playmode so that a user might upload to a server/create a build/etc)", GUILayout.Width(900));
                             if (previous != sVisible.AfterPlaymodeEnded) events.HasClickedToggle = true;
                         }
                     }

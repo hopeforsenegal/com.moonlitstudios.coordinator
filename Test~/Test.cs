@@ -38,7 +38,7 @@ public class Test : MonoBehaviour
         Debug.Log("This method is called right before exiting Play Mode when 'PlaymodeWillEnd' is used");
     }
 
-    [AfterPlaymode]
+    [AfterPlaymodeEnded]
     public static void MethodToCallAfterPlayMode()
     {
         Debug.Log("This method is called after exiting Play Mode when 'AfterPlaymode' is used");
