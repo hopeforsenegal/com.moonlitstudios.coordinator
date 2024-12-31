@@ -249,6 +249,24 @@ public static class Editors
         }
     }
 
+    public static MethodInfo[] AfterPlayMethods()
+    {
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        var afterPlayMethods = new List<MethodInfo>();
+        foreach (var assembly in assemblies) {
+            var types = assembly.GetTypes();
+            foreach (var type in types) {
+                var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                foreach (var method in methods) {
+                    if (method.GetCustomAttribute<AfterPlaymodeAttribute>() != null) {
+                        afterPlayMethods.Add(method);
+                    }
+                }
+            }
+        }
+        return afterPlayMethods.ToArray();
+    }
+
     private static void OriginalUpdate()
     {
         if (UntilExitSettings.Coordinator_HasDelayEnterPlaymode) {
@@ -264,17 +282,8 @@ public static class Editors
             if (EditorApplication.isUpdating) return;
             UntilExitSettings.Coordinator_IsRunningAfterPlaymodeEnded = false;
             /////////////////
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            foreach (var assembly in assemblies) {
-                var types = assembly.GetTypes();
-                foreach (var type in types) {
-                    var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                    foreach (var method in methods) {
-                        if (method.GetCustomAttribute<AfterPlaymodeAttribute>() != null) {
-                            method.Invoke(null, null);
-                        }
-                    }
-                }
+            foreach (var method in AfterPlayMethods()) {
+                method.Invoke(null, null);
             }
         }
 

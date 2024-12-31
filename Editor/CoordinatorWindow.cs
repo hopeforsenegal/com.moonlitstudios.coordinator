@@ -43,6 +43,7 @@ public class CoordinatorWindow : EditorWindow
         public int SelectedIndex;
         public bool PlaymodeWillEnd;
         public bool AfterPlaymodeEnded;
+        internal int NumAttributeMethods;
     }
 
     private struct Events
@@ -111,6 +112,8 @@ public class CoordinatorWindow : EditorWindow
             sVisible.CommandLineParams[i] = existingCommandLineParams[i];
         }
         for (var i = 0; i < MaximumAmountOfEditors; i++) sVisible.IsShowFoldout[i] = true;
+
+        sVisible.NumAttributeMethods = Editors.AfterPlayMethods().Length;
 
         EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
     }
@@ -324,7 +327,7 @@ public class CoordinatorWindow : EditorWindow
                             if (previous != sVisible.PlaymodeWillEnd) events.HasClickedToggle = true;
 
                             previous = sVisible.AfterPlaymodeEnded;
-                            sVisible.AfterPlaymodeEnded = GUILayout.Toggle(sVisible.AfterPlaymodeEnded, "AfterPlaymodeEnded | (Run Attribute [AfterPlaymodeEnded] after leaving playmode and domain reload so that a user might upload to a server or create a build)", GUILayout.Width(900));
+                            sVisible.AfterPlaymodeEnded = GUILayout.Toggle(sVisible.AfterPlaymodeEnded, $"AfterPlaymodeEnded | (Run Attribute [AfterPlaymodeEnded] on {sVisible.NumAttributeMethods} method(s) after leaving playmode and domain reload so that a user might upload to a server or create a build)", GUILayout.Width(900));
                             if (previous != sVisible.AfterPlaymodeEnded) events.HasClickedToggle = true;
                         }
                     }
