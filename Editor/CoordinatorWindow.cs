@@ -52,6 +52,8 @@ public class CoordinatorWindow : EditorWindow
         public string EditorDelete;
         public string BrowseFolder;
         public bool UpdateCoordinatePlay;
+        public bool Settings;
+        public bool Github;
         public bool StartPlaymode;
         public bool StartTests;
         public bool StopTests;
@@ -227,6 +229,12 @@ public class CoordinatorWindow : EditorWindow
             if (sVisible.Path != null && sVisible.Path.Length >= 1) {
                 GUILayout.BeginVertical();
                 {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.FlexibleSpace();
+                    events.Settings = GUILayout.Button(EditorGUIUtility.IconContent("_Popup@2x"), GUIStyle.none);
+                    events.Github = GUILayout.Button(EditorGUIUtility.IconContent("_Help@2x"), GUIStyle.none);
+                    GUILayout.EndHorizontal();
+
                     var previousSelection = sVisible.SelectedIndex;
                     var isToggled = RenderCoordinationMode();
                     if (isToggled != previousSelection) events.UpdateCoordinatePlay = true;
@@ -398,6 +406,12 @@ public class CoordinatorWindow : EditorWindow
         }
 
         /*- Handle Events -*/
+        if (events.Github) {
+            Application.OpenURL("https://github.com/hopeforsenegal/com.moonlitstudios.coordinator");
+        }
+        if (events.Settings) {
+            SettingsService.OpenProjectSettings(CoordinatorSettingsProvider.MenuLocationInProjectSettings);
+        }
         if (events.UpdateCoordinatePlay) {
             sVisible.IsDirty = true;
             EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = sVisible.SelectedIndex;
