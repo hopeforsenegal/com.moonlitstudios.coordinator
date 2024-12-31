@@ -1,15 +1,15 @@
 # Coordinator
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/hopeforsenegal/immediatestyle/blob/master/LICENSE.md)
 
-**Coordinator** A dead easy way to coordinate multiple instances of Unity. With it, you will be able to boot up multiple Unity Editors in order for them to help iterate with your **multiplayer** game. You can choose to have stand alone Editors, Editors that go into playmode, or Editors that play until a test is finished. 
+**Coordinator** A dead easy way to coordinate multiple instances of Unity. Use **Coordinator** to boot up multiple Unity Editors in order iterate playmode sessions with your **multiplayer** game. You can choose to have stand alone Editors or Editors that go into playmode (with settings that help with testing and/or building your game). 
 
 <img width="1120" alt="Screenshot 2024-12-16 at 11 58 26 PM" src="https://github.com/user-attachments/assets/10c6a64a-9fb6-4946-a24c-082bbfd675e0" />
 
 ## Features
 
-* **Standalone** interact with your [symlinked](https://en.wikipedia.org/wiki/Symbolic_link) or hard copy editors manually as if you created them and opened them yourself. Symlinked Editors have the benefit of reflecting script changes across the Main Editor and other symlinked projects.
+* **Standalone** interact with your [symlinked](https://en.wikipedia.org/wiki/Symbolic_link) or hard copy editors manually as if you created them and opened them yourself (This is what most people do to test their multiplayer games but now we've organized this process for you). Symlinked Editors have the benefit of reflecting script changes across the Main Editor and other symlinked projects.
 * **Playmode** your additional editors will go into playmode when the original main editor goes into playmode. Perfect for getting into a multiplayer game with fewer steps. 
-* **TestAndPlaymode** is the solution to be even less hands on. The editors will go into playmode until the main editor calls ```Editors.TestComplete``` and then call a post test method for you (perfect for going through a set of tests and then uploading a build).
+* **PlaymodeWillEnd and AfterPlaymodeEnded** is the solution to be even less hands on. The editors will go into playmode until the main editor calls ```Editors.TestComplete``` and then call a post test method for you (perfect for going through a set of tests and then uploading a build).
 * **Scripting Defines** so you can have one Editor run as **Server** and the other as **Client** (or perhaps **Demo**).
 
 ## Installation
