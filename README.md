@@ -34,7 +34,7 @@ https://github.com/hopeforsenegal/com.moonlitstudios.coordinator/blob/38f6aa3adc
 https://github.com/hopeforsenegal/com.moonlitstudios.coordinator/blob/38f6aa3adc2beb64eb2c19e765a502b73efb6788/Test~/Test.cs#L35-L39
 
 ## How does it work?
-Additional Editors are created with [Symlinks](https://en.wikipedia.org/wiki/Symbolic_link) or Hard copies. We use files on disk that allow each editor to communicate with each other (easier then rolling a socket solution or more elaborate interprocess communication... also benefits from surviving Domain Reloads). That's 90% of how it works. (_Feel free to gitignore these files on disk or extra projects that created if you use source control_)
+Additional Editors are created with [Symlinks](https://en.wikipedia.org/wiki/Symbolic_link) or Hard copies. We use files on disk that allow each editor to communicate with each other (easier then rolling a socket solution or more elaborate interprocess communication... also benefits from surviving Domain Reloads). That's 90% of how it works. (_Feel free to .gitignore these files on disk or extra projects that get created if they are picked up by your source control_)
 
 ## Need Help or want to chat?
 Feel free to just drop us a line on [Discord](https://discord.gg/8y87EEaftE). It's always better to have a real conversation and we can also screen share there. It's also not hard to reach us through our various other socials. There we can talk about the individual needs that you might have with your multiplayer projects.
