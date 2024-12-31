@@ -198,6 +198,7 @@ public class CoordinatorWindow : EditorWindow
                         var editor = sVisible.Path[i];
                         var editorInfo = EditorPaths.PopulateEditorInfo(editor);
                         var isProcessRunningForProject = false;
+                        var editorType = sVisible.IsSymlinked[i] ? EditorType.Symlink : EditorType.HardCopy;
                         foreach (var p in sVisible.PathToProcessIds) {
                             if (p.Path == editorInfo.Path) {
                                 isProcessRunningForProject = true;
@@ -210,10 +211,13 @@ public class CoordinatorWindow : EditorWindow
                         events.Index = i;
                         using (new EditorGUILayout.HorizontalScope()) {
                             sVisible.IsShowFoldout[i] = EditorGUILayout.Foldout(sVisible.IsShowFoldout[i], string.Empty, true);
+                            var status = $"[{editorType}]";
+                            if (isProcessRunningForProject) status = $"[{editorType}|Open]";
+
                             if (isProcessRunningForProject) {
-                                GUILayout.Label($"{editorInfo.Name} [Open]", EditorStyles.boldLabel);
+                                GUILayout.Label($"{status} {editorInfo.Name}", EditorStyles.boldLabel);
                             } else {
-                                GUILayout.Label(editorInfo.Name);
+                                GUILayout.Label($"{status} {editorInfo.Name}");
                             }
                             GUILayout.FlexibleSpace();
                             if (i != 0) {
@@ -228,10 +232,6 @@ public class CoordinatorWindow : EditorWindow
                         }
                         if (sVisible.IsShowFoldout[i]) {
                             GUILayout.Space(10);
-                            var editorType = sVisible.IsSymlinked[i] ? EditorType.Symlink : EditorType.HardCopy;
-                            GUILayout.BeginHorizontal("box");
-                            GUILayout.Label($"{editorType}", EditorStyles.toolbarButton);
-                            GUILayout.EndHorizontal();
 
                             GUILayout.BeginHorizontal();
                             EditorGUI.BeginDisabledGroup(true);
