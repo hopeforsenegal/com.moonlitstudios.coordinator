@@ -243,7 +243,7 @@ public class CoordinatorWindow : EditorWindow
                     if (sVisible.NumberOfProcessRunning == 0 && UntilExitSettings.Coordinator_TestState == EditorStates.AnEditorsOpen) {
                         UnityEngine.Debug.LogWarning("Might want to investigate this!");
                     }
-                    var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open", EditorStates.EditorsPlaymode => "All Editors are in Playmode", EditorStates.RunningPostTest => "Running Post Test methods" };
+                    var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open (switching modes not available)", EditorStates.EditorsPlaymode => "All Editors are in Playmode", EditorStates.RunningPostTest => "Running Post Test methods" };
                     if (EditorUtility.scriptCompilationFailed) statusMessage = "Compilation errors detected! Unable to go into Playmode or run Tests!";
                     EditorGUILayout.HelpBox(statusMessage, EditorUtility.scriptCompilationFailed ? MessageType.Error : MessageType.None, true);
 
