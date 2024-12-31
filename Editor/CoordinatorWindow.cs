@@ -142,38 +142,6 @@ public class CoordinatorWindow : EditorWindow
         sVisible.SelectedIndex = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
     }
 
-    private static Texture2D CreateRadioButtonTexture(int size, Color outlineColor, Color fillColor)
-    {
-        var texture = new Texture2D(size, size, TextureFormat.RGBA64, false) { filterMode = FilterMode.Bilinear };
-        var center = size / 2f;
-        var outerRadius = size / 2f - 1f;
-        var innerRadius = outerRadius - 2f; // 2px thick outline
-
-        for (var y = 0; y < size; y++) {
-            for (var x = 0; x < size; x++) {
-                var distanceFromCenter = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(center, center));
-
-                if (distanceFromCenter <= outerRadius) {
-                    var t = Mathf.Clamp01((distanceFromCenter - innerRadius) / 2f);
-                    var pixelColor = distanceFromCenter <= innerRadius
-                        ? fillColor
-                        : Color.Lerp(fillColor, outlineColor, t);
-
-                    // Apply anti-aliasing to the edges
-                    var alpha = 1f - Mathf.Clamp01(distanceFromCenter - outerRadius);
-                    pixelColor.a *= alpha;
-
-                    texture.SetPixel(x, y, pixelColor);
-                } else {
-                    texture.SetPixel(x, y, Color.clear);
-                }
-            }
-        }
-
-        texture.Apply();
-        return texture;
-    }
-
     private static void InitializeStyles()
     {
         sRadioButtonStyleBlue = new GUIStyle();
@@ -200,15 +168,13 @@ public class CoordinatorWindow : EditorWindow
             GUILayout.BeginHorizontal();
             GUILayout.BeginVertical();
             GUILayout.Space(20);
+
             var rectTop = RadioButton(0, ref sVisible.SelectedIndex, "No Coordination");
             var rectBottom = RadioButton(1, ref sVisible.SelectedIndex, "Coordinate Editors");
+            // Tool tips
+            if (rectTop.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y - 50, 400, 40), "Interact with your editors manually as if you created them and opened them yourself", EditorStyles.helpBox);
+            if (rectBottom.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 400, 40), "Your additional editors will go into playmode when the original main editor goes into playmode", EditorStyles.helpBox);
 
-            if (rectTop.Contains(Event.current.mousePosition)) {
-                GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y - 50, 400, 40), "Interact with your editors manually as if you created them and opened them yourself", EditorStyles.helpBox);
-            }
-            if (rectBottom.Contains(Event.current.mousePosition)) {
-                GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 400, 40), "Your additional editors will go into playmode when the original main editor goes into playmode", EditorStyles.helpBox);
-            }
             GUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -248,7 +214,7 @@ public class CoordinatorWindow : EditorWindow
             }
         }
 
-        if (sRadioButtonStyleBlue == null) {
+        if (sRadioButtonStyleBlue == null || sRadioButtonStyleBlue.normal.background == null) {
             InitializeStyles();
         }
 
@@ -579,6 +545,36 @@ public class CoordinatorWindow : EditorWindow
             DestroyImmediate(colorTexture);
             colorTexture = null;
         }
+    }
+
+    private static Texture2D CreateRadioButtonTexture(int size, Color outlineColor, Color fillColor)
+    {
+        var texture = new Texture2D(size, size, TextureFormat.RGBA64, false) { filterMode = FilterMode.Bilinear };
+        var center = size / 2f;
+        var outerRadius = size / 2f - 1f;
+        var innerRadius = outerRadius - 2f; // 2px thick outline
+
+        for (var y = 0; y < size; y++) {
+            for (var x = 0; x < size; x++) {
+                var distanceFromCenter = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(center, center));
+
+                if (distanceFromCenter <= outerRadius) {
+                    var t = Mathf.Clamp01((distanceFromCenter - innerRadius) / 2f);
+                    var pixelColor = distanceFromCenter <= innerRadius
+                                        ? fillColor
+                                        : Color.Lerp(fillColor, outlineColor, t);
+                    var alpha = 1f - Mathf.Clamp01(distanceFromCenter - outerRadius); // Apply anti-aliasing to the edges
+                    pixelColor.a *= alpha;
+
+                    texture.SetPixel(x, y, pixelColor);
+                } else {
+                    texture.SetPixel(x, y, Color.clear);
+                }
+            }
+        }
+
+        texture.Apply();
+        return texture;
     }
 
     private void OnDisable()
