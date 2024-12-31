@@ -200,8 +200,8 @@ public class CoordinatorWindow : EditorWindow
             GUILayout.BeginHorizontal();
             GUILayout.BeginVertical();
             GUILayout.Space(20);
-            var rectTop = RadioButton(0, ref sVisible.SelectedIndex, "Standalone");
-            var rectBottom = RadioButton(1, ref sVisible.SelectedIndex, "Coordinate Playmode");
+            var rectTop = RadioButton(0, ref sVisible.SelectedIndex, "No Coordination");
+            var rectBottom = RadioButton(1, ref sVisible.SelectedIndex, "Coordinate Editors");
 
             if (rectTop.Contains(Event.current.mousePosition)) {
                 GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y - 50, 400, 40), "Interact with your editors manually as if you created them and opened them yourself", EditorStyles.helpBox);

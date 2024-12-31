@@ -17,7 +17,7 @@ internal static class CommandLineParams
     public static string Additional { get; } = "--additional";
     public static string Original { get; } = "-original";
     private static string OriginalProcessID { get; } = $"{Original} {Process.GetCurrentProcess().Id}";
-    public static string Port { get; } = "-port";
+    private static string Port { get; } = "-port";
     private static string BuildPortParam(string port) => $"{Port} {port}";
     public static string ParsePort(string commandLine)
     {
