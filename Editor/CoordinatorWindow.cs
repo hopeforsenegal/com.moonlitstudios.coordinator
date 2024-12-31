@@ -41,6 +41,8 @@ public class CoordinatorWindow : EditorWindow
         public bool IsDirty;
         public int NumberOfProcessRunning;
         public int SelectedIndex;
+        public bool PlaymodeWillEnd;
+        public bool AfterPlaymodeEnded;
     }
 
     private struct Events
@@ -54,9 +56,7 @@ public class CoordinatorWindow : EditorWindow
         public bool UpdateCoordinatePlay;
         public bool Settings;
         public bool Github;
-        public bool StartPlaymode;
-        public bool StartTests;
-        public bool StopTests;
+        public bool HasClickedToggle;
     }
 
     private class BackgroundColorScope : GUI.Scope
@@ -243,7 +243,11 @@ public class CoordinatorWindow : EditorWindow
                     if (sVisible.NumberOfProcessRunning == 0 && UntilExitSettings.Coordinator_TestState == EditorStates.AnEditorsOpen) {
                         UnityEngine.Debug.LogWarning("Might want to investigate this!");
                     }
-                    var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open (switching modes not available)", EditorStates.EditorsPlaymode => "All Editors are in Playmode", EditorStates.RunningPostTest => "Running Post Test methods" };
+                    var anEditorOpenMessage = $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open. (switching modes not available until editors are close)";
+                    if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1) anEditorOpenMessage = $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open and ready for Playmode. (Switching modes not available until editors are close)";
+                    if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1 && EditorApplication.isPlaying) anEditorOpenMessage = "All Editors are in Playmode";
+                    if (UntilExitSettings.Coordinator_IsRunningAfterPlaymodeEnded) anEditorOpenMessage = "Running Post Test methods";
+                    var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => anEditorOpenMessage, };
                     if (EditorUtility.scriptCompilationFailed) statusMessage = "Compilation errors detected! Unable to go into Playmode or run Tests!";
                     EditorGUILayout.HelpBox(statusMessage, EditorUtility.scriptCompilationFailed ? MessageType.Error : MessageType.None, true);
 
@@ -379,14 +383,15 @@ public class CoordinatorWindow : EditorWindow
                     using (new EnableGroupScope(sVisible.NumberOfProcessRunning > 0 && !EditorUtility.scriptCompilationFailed))
                     using (new EditorGUILayout.HorizontalScope())
                     using (new BackgroundColorScope(hasAppearTestable ? TestBlue : Color.red)) {
-                        events.StartPlaymode = GUILayout.Button("Run Playmode", GUILayout.Width(200));
 
                         if (hasAppearTestable) {
-                            events.StartTests = GUILayout.Button("Start Tests", GUILayout.Width(200));
-                        } else {
-                            using (new EnableGroupScope(true)) {
-                                events.StopTests = GUILayout.Button("Stop Tests", GUILayout.Width(200));
-                            }
+                            var previous = sVisible.PlaymodeWillEnd;
+                            sVisible.PlaymodeWillEnd = GUILayout.Toggle(sVisible.PlaymodeWillEnd, "Call [PlaymodeWillEnd]", GUILayout.Width(200));
+                            if (previous != sVisible.PlaymodeWillEnd) events.HasClickedToggle = true;
+
+                            previous = sVisible.AfterPlaymodeEnded;
+                            sVisible.AfterPlaymodeEnded = GUILayout.Toggle(sVisible.AfterPlaymodeEnded, "Call [AfterPlaymodeEnded]", GUILayout.Width(200));
+                            if (previous != sVisible.AfterPlaymodeEnded) events.HasClickedToggle = true;
                         }
                     }
 
@@ -416,22 +421,9 @@ public class CoordinatorWindow : EditorWindow
             sVisible.IsDirty = true;
             EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = sVisible.SelectedIndex;
         }
-        if (events.StartTests || events.StartPlaymode) {
-            sVisible.IsDirty = true;
-            UntilExitSettings.Coordinator_HasTestsSetToRun = events.StartTests;
-            UntilExitSettings.Coordinator_TestState = EditorStates.EditorsPlaymode;
-            SaveProjectSettings();
-            AssetDatabase.Refresh();
-
-            EditorApplication.delayCall += () =>
-            {
-                UntilExitSettings.Coordinator_HasDelayEnterPlaymode = true;
-            };
-        }
-        if (events.StopTests) {
-            sVisible.IsDirty = true;
-            EditorApplication.isPlaying = false;
-            UntilExitSettings.Coordinator_TestState = EditorStates.AnEditorsOpen;
+        if (events.HasClickedToggle) {
+            UntilExitSettings.Coordinator_PlaymodeWillEnd = sVisible.PlaymodeWillEnd;
+            UntilExitSettings.Coordinator_AfterPlaymodeEnded = sVisible.AfterPlaymodeEnded;
         }
         if (events.EditorAdd != default) {
             sVisible.IsDirty = true;

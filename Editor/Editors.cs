@@ -11,7 +11,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 internal enum EditorType { Symlink = 1, HardCopy }
-internal enum EditorStates { AllEditorsClosed, AnEditorsOpen, EditorsPlaymode, RunningPostTest }
+internal enum EditorStates { AllEditorsClosed, AnEditorsOpen }
 internal static class CommandLineParams
 {
     public static string Additional { get; } = "--additional";
@@ -62,8 +62,10 @@ internal static class UntilExitSettings // SessionState is cleared when Unity ex
     public static string Coordinator_CurrentGlobalScriptingDefines { get => SessionState.GetString(nameof(Coordinator_CurrentGlobalScriptingDefines), string.Empty); set => SessionState.SetString(nameof(Coordinator_CurrentGlobalScriptingDefines), value); }
     public static bool Coordinator_IsCoordinatePlayThisSessionOnAdditional { get => SessionState.GetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsCoordinatePlayThisSessionOnAdditional), value ? 1 : 0); }
     public static bool Coordinator_HasDelayEnterPlaymode { get => SessionState.GetInt(nameof(Coordinator_HasDelayEnterPlaymode), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_HasDelayEnterPlaymode), value ? 1 : 0); }
-    public static bool Coordinator_HasTestsSetToRun { get => SessionState.GetInt(nameof(Coordinator_HasTestsSetToRun), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_HasTestsSetToRun), value ? 1 : 0); }
-    public static bool Coordinator_IsRunPostTest { get => SessionState.GetInt(nameof(Coordinator_IsRunPostTest), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsRunPostTest), value ? 1 : 0); }
+    public static bool Coordinator_PlaymodeWillEnd { get => SessionState.GetInt(nameof(Coordinator_PlaymodeWillEnd), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_PlaymodeWillEnd), value ? 1 : 0); }
+    public static bool Coordinator_AfterPlaymodeEnded { get => SessionState.GetInt(nameof(Coordinator_AfterPlaymodeEnded), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_AfterPlaymodeEnded), value ? 1 : 0); }
+    public static bool Coordinator_IsRunningPlaymodeWillEnd { get => SessionState.GetInt(nameof(Coordinator_IsRunningPlaymodeWillEnd), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsRunningPlaymodeWillEnd), value ? 1 : 0); }
+    public static bool Coordinator_IsRunningAfterPlaymodeEnded { get => SessionState.GetInt(nameof(Coordinator_IsRunningAfterPlaymodeEnded), 0) == 1; set => SessionState.SetInt(nameof(Coordinator_IsRunningAfterPlaymodeEnded), value ? 1 : 0); }
 }
 internal class SessionStateConvenientListInt
 {
@@ -143,6 +145,8 @@ public static class Editors
     private static float sRefreshInterval;
     public static NamedBuildTarget BuildTarget { get; } = NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone);
 
+    public static Action PlaymodeWillEnd; // Note: Static functions typically don't get garbage collected and last once per domain reload
+
     static Editors()
     {
         if (!IsAdditional()) {
@@ -181,7 +185,7 @@ public static class Editors
     {
         UnityEngine.Debug.Log("<color=green>Tests Complete!</color>");
         if (!IsAdditional()) {
-            UntilExitSettings.Coordinator_TestState = EditorStates.RunningPostTest;
+            PlaymodeWillEnd?.Invoke();
             EditorApplication.isPlaying = false;
         } // The additional editors will shut off when the original sends a message to them
     }// Runs the Post Test step after leaving Playmode because of domain reload and Editor availability
@@ -207,13 +211,12 @@ public static class Editors
 
         if (playmodeState == PlayModeStateChange.ExitingPlayMode) {
             UnityEngine.Debug.Log($"UntilExitSettings.Coordinator_TestState {UntilExitSettings.Coordinator_TestState}");
-            if (UntilExitSettings.Coordinator_TestState == EditorStates.RunningPostTest) {
-                UntilExitSettings.Coordinator_TestState = EditorStates.AnEditorsOpen; // Editors have to be open to be in post test
-                /////////////////
-                if (UntilExitSettings.Coordinator_HasTestsSetToRun) {
-                    UntilExitSettings.Coordinator_HasTestsSetToRun = false;
-                    UntilExitSettings.Coordinator_IsRunPostTest = true;
-                }
+            /////////////////
+            if (UntilExitSettings.Coordinator_PlaymodeWillEnd) {
+                UntilExitSettings.Coordinator_IsRunningPlaymodeWillEnd = true;
+            }
+            if (UntilExitSettings.Coordinator_AfterPlaymodeEnded) {
+                UntilExitSettings.Coordinator_IsRunningAfterPlaymodeEnded = true;
             }
             return;
         }
@@ -256,10 +259,10 @@ public static class Editors
             EditorApplication.isPlaying = true; // the amount of silent failures to domain reloads is insane
         }
 
-        if (UntilExitSettings.Coordinator_IsRunPostTest) {
+        if (UntilExitSettings.Coordinator_IsRunningAfterPlaymodeEnded) {
             if (EditorApplication.isCompiling) return;
             if (EditorApplication.isUpdating) return;
-            UntilExitSettings.Coordinator_IsRunPostTest = false;
+            UntilExitSettings.Coordinator_IsRunningAfterPlaymodeEnded = false;
             /////////////////
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             foreach (var assembly in assemblies) {
@@ -267,7 +270,7 @@ public static class Editors
                 foreach (var type in types) {
                     var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                     foreach (var method in methods) {
-                        if (method.GetCustomAttribute<AfterTestAttribute>() != null) {
+                        if (method.GetCustomAttribute<AfterPlaymodeAttribute>() != null) {
                             method.Invoke(null, null);
                         }
                     }

@@ -7,7 +7,7 @@ public class Test : MonoBehaviour
     {
         if (Editors.IsAdditional()) {
             Debug.Log("Additional said something like intended");
-        }else{
+        } else {
             Debug.Log("Original said something like intended");
         }
 #if GLOBAL_SCRIPTING_DEFINE // NOTE: This would be a scripting define that the user defined (in the Coordinator UI or in ProjectSettings)
@@ -18,6 +18,7 @@ public class Test : MonoBehaviour
 #else
         Debug.Log("Original said something else like intended");
 #endif
+        Editors.PlaymodeWillEnd += TestVerificationAndValidation;
         m_Timer = 20;
     }
 
@@ -32,9 +33,14 @@ public class Test : MonoBehaviour
         }
     }
 
-    [AfterTest]
+    public static void TestVerificationAndValidation()
+    {
+        Debug.Log("This method is called right before exiting Play Mode when 'PlaymodeWillEnd' is used");
+    }
+
+    [AfterPlaymode]
     public static void MethodToCallAfterPlayMode()
     {
-        Debug.Log("This method is called after exiting Play Mode when 'Start Tests' is used");
+        Debug.Log("This method is called after exiting Play Mode when 'AfterPlaymode' is used");
     }
 }
