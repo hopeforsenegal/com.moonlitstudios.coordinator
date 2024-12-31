@@ -115,93 +115,10 @@ public class CoordinatorWindow : EditorWindow
         EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged; // Duplicated from Editors for convenience (its more code to make this a singleton simply to bypass this)
     }
 
-    private static Rect RadioButton(int index, ref int selectedIndex, string name)
+    protected void OnDisable()
     {
-        var controlRect = EditorGUILayout.BeginHorizontal();
-        var isSelected = selectedIndex == index;
-        if (GUILayout.Toggle(isSelected, "", index == 0 ? sRadioButtonStyleBlue : sRadioButtonStyleGreen, GUILayout.Width(20), GUILayout.Height(20))) {
-            selectedIndex = index;
-        }
-        GUILayout.Space(10);
-
-        GUILayout.BeginVertical();
-        GUILayout.Space(-1);
-        GUILayout.Label(name, sLabelStyle);
-        GUILayout.EndVertical();
-
-        EditorGUILayout.EndHorizontal();
-        return controlRect;
-    }
-
-    private static void InitializeVisibleMemory()
-    {
-        sVisible.ScriptingDefineSymbols = new string[MaximumAmountOfEditors];
-        sVisible.PreviousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
-        sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
-        sVisible.IsSymlinked = new bool[MaximumAmountOfEditors];
-        sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
-        sVisible.IsShowFoldoutNew = true;
-        sVisible.SelectedIndex = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
-    }
-
-    private static void InitializeStyles()
-    {
-        sRadioButtonStyleBlue = new GUIStyle();
-        sRadioButtonStyleBlue.normal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), Color.gray);
-        sRadioButtonStyleBlue.onNormal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), new Color(0.2f, 0.6f, 0.9f));
-        sRadioButtonStyleGreen = new GUIStyle();
-        sRadioButtonStyleGreen.normal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), Color.gray);
-        sRadioButtonStyleGreen.onNormal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), new Color(0.2f, 0.9f, 0.6f));
-
-        sLabelStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, normal = { textColor = CoolGray } };
-    }
-
-    private static bool IconButton(string iconPath, out Rect rect)
-    {
-        var isClicked = GUILayout.Button(EditorGUIUtility.IconContent(iconPath), GUIStyle.none);
-        rect = GUILayoutUtility.GetLastRect();
-        return isClicked;
-    }
-
-    private static int RenderCoordinationMode(ref Events events)
-    {
-        GUILayout.BeginHorizontal("box");
-        GUILayout.FlexibleSpace();
-
-        using (new EnableGroupScope(sVisible.NumberOfProcessRunning == 0)) {
-            GUILayout.BeginVertical("groupbox", GUILayout.Width(400));
-
-            GUILayout.BeginHorizontal();
-            GUILayout.FlexibleSpace();
-            events.Settings = IconButton("_Popup@2x", out var settingsRect);
-            events.Github = IconButton("_Help@2x", out var githubRect);
-            // Tool tips
-            if (settingsRect.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 200, 20), "Settings", EditorStyles.helpBox);
-            if (githubRect.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 200, 20), "Help/Documentation", EditorStyles.helpBox);
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("Coordination Mode:", EditorStyles.boldLabel);
-            GUILayout.Space(20);
-
-
-            GUILayout.BeginVertical();
-            GUILayout.Space(20);
-            var rectTop = RadioButton(0, ref sVisible.SelectedIndex, "No Coordination");
-            var rectBottom = RadioButton(1, ref sVisible.SelectedIndex, "Coordinate Editors");
-            // Tool tips
-            if (rectTop.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y - 50, 400, 40), "Interact with your editors manually as if you created them and opened them yourself", EditorStyles.helpBox);
-            if (rectBottom.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 400, 40), "Your additional editors will go into playmode when the original main editor goes into playmode", EditorStyles.helpBox);
-            GUILayout.EndVertical();
-            GUILayout.FlexibleSpace();
-            GUILayout.EndHorizontal();
-
-            GUILayout.EndVertical();
-        }
-
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
-        return sVisible.SelectedIndex;
+        DestroyColorTexture(ref sColorTextureA);
+        DestroyColorTexture(ref sColorTextureB);
     }
 
     protected void OnGUI()
@@ -391,16 +308,15 @@ public class CoordinatorWindow : EditorWindow
                 var hasAppearTestable = testState == EditorStates.AnEditorsOpen || testState == EditorStates.AllEditorsClosed;
                 using (new EditorGUILayout.VerticalScope("box")) {
                     using (new EnableGroupScope(sVisible.NumberOfProcessRunning > 0 && !EditorUtility.scriptCompilationFailed))
-                    using (new EditorGUILayout.HorizontalScope())
+                    using (new EditorGUILayout.VerticalScope())
                     using (new BackgroundColorScope(hasAppearTestable ? TestBlue : Color.red)) {
-
                         if (hasAppearTestable) {
                             var previous = sVisible.PlaymodeWillEnd;
-                            sVisible.PlaymodeWillEnd = GUILayout.Toggle(sVisible.PlaymodeWillEnd, "Call [PlaymodeWillEnd]", GUILayout.Width(200));
+                            sVisible.PlaymodeWillEnd = GUILayout.Toggle(sVisible.PlaymodeWillEnd,   "PlaymodeWillEnd        | (Invoke Action PlaymodeWillEnd.Invoke() right before we exit playmode so that a user might verify the game's state, ex. 10 goals)", GUILayout.Width(900));
                             if (previous != sVisible.PlaymodeWillEnd) events.HasClickedToggle = true;
 
                             previous = sVisible.AfterPlaymodeEnded;
-                            sVisible.AfterPlaymodeEnded = GUILayout.Toggle(sVisible.AfterPlaymodeEnded, "Call [AfterPlaymodeEnded]", GUILayout.Width(200));
+                            sVisible.AfterPlaymodeEnded = GUILayout.Toggle(sVisible.AfterPlaymodeEnded, "AfterPlaymodeEnded | (Run Attribute [AfterPlaymodeEnded] after leaving playmode and domain reload so that a user might upload to a server or create a build)", GUILayout.Width(900));
                             if (previous != sVisible.AfterPlaymodeEnded) events.HasClickedToggle = true;
                         }
                     }
@@ -507,49 +423,98 @@ public class CoordinatorWindow : EditorWindow
         SaveProjectSettings();
     }
 
-    private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
+    private static void InitializeVisibleMemory()
     {
-        if (playmodeState != PlayModeStateChange.ExitingEditMode) return;
-        SaveProjectSettings();
+        sVisible.ScriptingDefineSymbols = new string[MaximumAmountOfEditors];
+        sVisible.PreviousScriptingDefineSymbols = new string[MaximumAmountOfEditors];
+        sVisible.CommandLineParams = new string[MaximumAmountOfEditors];
+        sVisible.IsSymlinked = new bool[MaximumAmountOfEditors];
+        sVisible.IsShowFoldout = new bool[MaximumAmountOfEditors];
+        sVisible.IsShowFoldoutNew = true;
+        sVisible.SelectedIndex = EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal;
     }
 
-    private static void SaveProjectSettings()
+    private static void InitializeStyles()
     {
-        if (sVisible.ScriptingDefineSymbols == null) return;
-        if (sProjectSettingsInMemory == null) return;
+        sRadioButtonStyleBlue = new GUIStyle();
+        sRadioButtonStyleBlue.normal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), Color.gray);
+        sRadioButtonStyleBlue.onNormal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), new Color(0.2f, 0.6f, 0.9f));
+        sRadioButtonStyleGreen = new GUIStyle();
+        sRadioButtonStyleGreen.normal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), Color.gray);
+        sRadioButtonStyleGreen.onNormal.background = CreateRadioButtonTexture(16, new Color(0.3f, 0.3f, 0.3f), new Color(0.2f, 0.9f, 0.6f));
 
-        var scriptingDefineCounts = 0;
-        foreach (var item in sVisible.ScriptingDefineSymbols) {
-            if (!string.IsNullOrWhiteSpace(item)) {
-                scriptingDefineCounts++;
-            }
+        sLabelStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, normal = { textColor = CoolGray } };
+    }
+
+    private static Rect RadioButton(int index, ref int selectedIndex, string name)
+    {
+        var controlRect = EditorGUILayout.BeginHorizontal();
+        var isSelected = selectedIndex == index;
+        if (GUILayout.Toggle(isSelected, "", index == 0 ? sRadioButtonStyleBlue : sRadioButtonStyleGreen, GUILayout.Width(20), GUILayout.Height(20))) {
+            selectedIndex = index;
         }
-        var commandLineParamCounts = 0;
-        foreach (var item in sVisible.CommandLineParams) {
-            if (!string.IsNullOrWhiteSpace(item)) {
-                commandLineParamCounts++;
-            }
+        GUILayout.Space(10);
+
+        GUILayout.BeginVertical();
+        GUILayout.Space(-1);
+        GUILayout.Label(name, sLabelStyle);
+        GUILayout.EndVertical();
+
+        EditorGUILayout.EndHorizontal();
+        return controlRect;
+    }
+
+    private static bool IconButton(string iconPath, out Rect rect)
+    {
+        var isClicked = GUILayout.Button(EditorGUIUtility.IconContent(iconPath), GUIStyle.none);
+        rect = GUILayoutUtility.GetLastRect();
+        return isClicked;
+    }
+
+    private static int RenderCoordinationMode(ref Events events)
+    {
+        GUILayout.BeginHorizontal("box");
+        GUILayout.FlexibleSpace();
+
+        using (new EnableGroupScope(sVisible.NumberOfProcessRunning == 0)) {
+            GUILayout.BeginVertical("groupbox", GUILayout.Width(400));
+
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            events.Settings = IconButton("_Popup@2x", out var settingsRect);
+            events.Github = IconButton("_Help@2x", out var githubRect);
+            // Tool tips
+            if (settingsRect.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 200, 20), "Settings", EditorStyles.helpBox);
+            if (githubRect.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 200, 20), "Help/Documentation", EditorStyles.helpBox);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Coordination Mode:", EditorStyles.boldLabel);
+            GUILayout.Space(20);
+
+            GUILayout.BeginVertical();
+            GUILayout.Space(20);
+            var rectTop = RadioButton(0, ref sVisible.SelectedIndex, "No Coordination");
+            var rectBottom = RadioButton(1, ref sVisible.SelectedIndex, "Coordinate Editors");
+            // Tool tips
+            if (rectTop.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y - 50, 400, 40), "Interact with your editors manually as if you created them and opened them yourself", EditorStyles.helpBox);
+            if (rectBottom.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 400, 40), "Your additional editors will go into playmode when the original main editor goes into playmode", EditorStyles.helpBox);
+            GUILayout.EndVertical();
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.EndVertical();
         }
-        UnityEngine.Debug.Log($"Saving scripting {scriptingDefineCounts} define(s) and {commandLineParamCounts} command line param(s) with '{PlayerSettings.GetScriptingDefineSymbols(Editors.BuildTarget)}' vs '{sVisible.GlobalScriptingDefineSymbols}'");
-        sProjectSettingsInMemory.scriptingDefineSymbols = sVisible.ScriptingDefineSymbols;
-        sProjectSettingsInMemory.commandlineParams = sVisible.CommandLineParams;
 
-        foreach (var group in (BuildTargetGroup[])Enum.GetValues(typeof(BuildTargetGroup))) {
-            if (group == BuildTargetGroup.Unknown) continue;
-
-            try { PlayerSettings.SetScriptingDefineSymbolsForGroup(group, sVisible.GlobalScriptingDefineSymbols); }
-            catch (ArgumentException) { }
-        }
-
-        UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
-        EditorUtility.SetDirty(sProjectSettingsInMemory);
+        GUILayout.FlexibleSpace();
+        GUILayout.EndHorizontal();
+        return sVisible.SelectedIndex;
     }
 
     private static Texture2D CreateColorTexture(ref Texture2D colorTexture, Color color)
     {
-        if (colorTexture == null) {
-            colorTexture = new Texture2D(1, 1);
-        }
+        if (colorTexture == null) colorTexture = new Texture2D(1, 1);
+
         colorTexture.SetPixel(0, 0, color);
         colorTexture.Apply();
         return colorTexture;
@@ -593,9 +558,40 @@ public class CoordinatorWindow : EditorWindow
         return texture;
     }
 
-    private void OnDisable()
+    private static void OriginalCoordinatePlaymodeStateChanged(PlayModeStateChange playmodeState)
     {
-        DestroyColorTexture(ref sColorTextureA);
-        DestroyColorTexture(ref sColorTextureB);
+        if (playmodeState != PlayModeStateChange.ExitingEditMode) return;
+        SaveProjectSettings();
+    }
+
+    private static void SaveProjectSettings()
+    {
+        if (sVisible.ScriptingDefineSymbols == null) return;
+        if (sProjectSettingsInMemory == null) return;
+
+        var scriptingDefineCounts = 0;
+        foreach (var item in sVisible.ScriptingDefineSymbols) {
+            if (string.IsNullOrWhiteSpace(item)) continue;
+            scriptingDefineCounts++; break;
+        }
+        var commandLineParamCounts = 0;
+        foreach (var item in sVisible.CommandLineParams) {
+            if (!string.IsNullOrWhiteSpace(item)) {
+                commandLineParamCounts++;
+            }
+        }
+        UnityEngine.Debug.Log($"Saving scripting {scriptingDefineCounts} define(s) and {commandLineParamCounts} command line param(s) with '{PlayerSettings.GetScriptingDefineSymbols(Editors.BuildTarget)}' vs '{sVisible.GlobalScriptingDefineSymbols}'");
+        sProjectSettingsInMemory.scriptingDefineSymbols = sVisible.ScriptingDefineSymbols;
+        sProjectSettingsInMemory.commandlineParams = sVisible.CommandLineParams;
+
+        foreach (var group in (BuildTargetGroup[])Enum.GetValues(typeof(BuildTargetGroup))) {
+            if (group == BuildTargetGroup.Unknown) continue;
+
+            try { PlayerSettings.SetScriptingDefineSymbolsForGroup(group, sVisible.GlobalScriptingDefineSymbols); }
+            catch (ArgumentException) { }
+        }
+
+        UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
+        EditorUtility.SetDirty(sProjectSettingsInMemory);
     }
 }
