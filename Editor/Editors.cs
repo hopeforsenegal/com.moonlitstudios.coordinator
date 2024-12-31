@@ -218,6 +218,18 @@ public static class Editors
             return;
         }
 
+        if (!EditorApplication.isPlayingOrWillChangePlaymode && EditorApplication.isPlaying) {
+            UnityEngine.Debug.Log($"Writing command '{playmodeState}'");
+            // Fake the mode we are switching to and send it to the additionals so they can go into playmode
+            // at the same time instead of with a delay. if it gets killed because of a domain reload the queued version should still reach
+            // in general though it seems the editors arestill delayed with this method
+            var scriptingDefines = new string[CoordinatorWindow.MaximumAmountOfEditors];
+            for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
+                scriptingDefines[i] = PlayerSettings.GetScriptingDefineSymbols(BuildTarget) + ";" + ProjectSettings.LoadInstance().scriptingDefineSymbols[i];
+                SocketLayer.WriteMessage($"{MessageEndpoint.Playmode}{i}", Messages.Play(scriptingDefines));
+            }
+        }
+
         Playmode.Queue((int)playmodeState); // We queue these for later because domain reloads
     }
 
