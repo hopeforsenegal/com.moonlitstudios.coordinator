@@ -10,10 +10,10 @@ public class Test : MonoBehaviour
         }else{
             Debug.Log("Original said something like intended");
         }
-#if GLOBAL_SCRIPTING_DEFINE
+#if GLOBAL_SCRIPTING_DEFINE // NOTE: This would be a scripting define that the user defined (in the Coordinator UI or in ProjectSettings)
         Debug.Log("Respecting the Global scripting define");
 #endif
-#if ADDITIONAL_ONLY_SCRIPTING_DEFINE
+#if ADDITIONAL_ONLY_SCRIPTING_DEFINE // NOTE: This would be a scripting define that the user defined (in the Coordinator UI or in ProjectSettings)
         Debug.Log("Additional said something else like intended");
 #else
         Debug.Log("Original said something else like intended");
