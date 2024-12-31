@@ -52,7 +52,7 @@ internal static class Messages
 }
 internal static class EditorUserSettings
 {
-    public static int Coordinator_CoordinatePlaySettingOnOriginal { get => EditorPrefs.GetInt(nameof(Coordinator_CoordinatePlaySettingOnOriginal), 0); set => EditorPrefs.SetInt(nameof(Coordinator_CoordinatePlaySettingOnOriginal), value); }
+    public static int Coordinator_CoordinatePlaySettingOnOriginal { get => EditorPrefs.GetInt(nameof(Coordinator_CoordinatePlaySettingOnOriginal), 1); set => EditorPrefs.SetInt(nameof(Coordinator_CoordinatePlaySettingOnOriginal), value); } // Default to being set to "Coordinate Editors"
 }
 internal static class UntilExitSettings // SessionState is cleared when Unity exits. But survives domain reloads.
 {
