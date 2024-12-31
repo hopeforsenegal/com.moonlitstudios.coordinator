@@ -167,9 +167,7 @@ public class CoordinatorWindow : EditorWindow
                     if (isToggled != previousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(5);
                     EditorGUI.LabelField(EditorGUILayout.GetControlRect(GUILayout.Width(50)), "Status:", EditorStyles.boldLabel);
-                    if (sVisible.NumberOfProcessRunning == 0 && UntilExitSettings.Coordinator_TestState == EditorStates.AnEditorsOpen) {
-                        UnityEngine.Debug.LogWarning("Might want to investigate this!");
-                    }
+
                     var anEditorOpenMessage = $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open. (switching modes not available until editors are close)";
                     if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1) anEditorOpenMessage = $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open and ready for Playmode. (Switching modes not available until editors are close)";
                     if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1 && EditorApplication.isPlaying) anEditorOpenMessage = "All Editors are in Playmode";
@@ -179,11 +177,24 @@ public class CoordinatorWindow : EditorWindow
                     EditorGUILayout.HelpBox(statusMessage, EditorUtility.scriptCompilationFailed ? MessageType.Error : MessageType.None, true);
 
                     GUILayout.Space(10);
-                    GUILayout.Label("Editors:", EditorStyles.boldLabel);
+                    GUILayout.Label("Main:", EditorStyles.boldLabel);
+                    {
+                        var editor = sVisible.Path[0];
+                        var editorInfo = EditorPaths.PopulateEditorInfo(editor);
+                        GUILayout.BeginHorizontal();
+                        EditorGUI.BeginDisabledGroup(true);
+                        GUILayout.Space(10);
+                        EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
+                        EditorGUI.EndDisabledGroup();
+                        events.BrowseFolder = GUILayout.Button(Browse, GUILayout.Width(170)) ? editorInfo.Path : events.BrowseFolder;
+                        GUILayout.EndHorizontal();
+                    }
+                    GUILayout.Space(10);
+                    GUILayout.Label("Additionals:", EditorStyles.boldLabel);
                     sVisible.ScrollPosition = EditorGUILayout.BeginScrollView(sVisible.ScrollPosition);
 
                     sVisible.NumberOfProcessRunning = 0;
-                    for (var i = 0; i < sVisible.Path.Length; i++) {
+                    for (var i = 1; i < sVisible.Path.Length; i++) {
                         var editor = sVisible.Path[i];
                         var editorInfo = EditorPaths.PopulateEditorInfo(editor);
                         var isProcessRunningForProject = false;
@@ -218,11 +229,10 @@ public class CoordinatorWindow : EditorWindow
                         if (sVisible.IsShowFoldout[i]) {
                             GUILayout.Space(10);
                             var editorType = sVisible.IsSymlinked[i] ? EditorType.Symlink : EditorType.HardCopy;
-                            if (i != 0) {
-                                GUILayout.BeginHorizontal("box");
-                                GUILayout.Label($"{editorType}", EditorStyles.toolbarButton);
-                                GUILayout.EndHorizontal();
-                            }
+                            GUILayout.BeginHorizontal("box");
+                            GUILayout.Label($"{editorType}", EditorStyles.toolbarButton);
+                            GUILayout.EndHorizontal();
+
                             GUILayout.BeginHorizontal();
                             EditorGUI.BeginDisabledGroup(true);
                             EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
@@ -230,50 +240,48 @@ public class CoordinatorWindow : EditorWindow
                             events.BrowseFolder = GUILayout.Button(Browse, GUILayout.Width(170)) ? editorInfo.Path : events.BrowseFolder;
                             GUILayout.EndHorizontal();
 
-                            if (i != 0) {
-                                EditorGUI.BeginDisabledGroup(isProcessRunningForProject);
-                                EditorGUILayout.LabelField("Command Line Params");
-                                sVisible.CommandLineParams[i] = EditorGUILayout.TextField(sVisible.CommandLineParams[i], EditorStyles.textField);
+                            EditorGUI.BeginDisabledGroup(isProcessRunningForProject);
+                            EditorGUILayout.LabelField("Command Line Params");
+                            sVisible.CommandLineParams[i] = EditorGUILayout.TextField(sVisible.CommandLineParams[i], EditorStyles.textField);
 
-                                if (sVisible.SelectedIndex == 1) {
-                                    EditorGUILayout.LabelField("Scripting Define Symbols on Play [';' separated] (Note: This Overwrites! We will improve this in the future)");
-                                    GUILayout.BeginHorizontal();
-                                    var previousScriptingDefineSymbols = sVisible.ScriptingDefineSymbols[i];
-                                    sVisible.ScriptingDefineSymbols[i] = EditorGUILayout.TextField(sVisible.ScriptingDefineSymbols[i], EditorStyles.textField);
-                                    if (previousScriptingDefineSymbols != sVisible.ScriptingDefineSymbols[i]) {
-                                        sVisible.IsDirty = true;
-                                    }
-
-                                    GUILayout.EndHorizontal();
-                                }
-
-                                GUILayout.Space(10);
-
+                            if (sVisible.SelectedIndex == 1) {
+                                EditorGUILayout.LabelField("Scripting Define Symbols on Play [';' separated] (Note: This Overwrites! We will improve this in the future)");
                                 GUILayout.BeginHorizontal();
-                                var deleteButtonStyle = new GUIStyle(GUI.skin.button)
-                                {
-                                    normal = { background = CreateColorTexture(ref sColorTextureA, new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },
-                                    active = { background = CreateColorTexture(ref sColorTextureB, new Color(0.1f, 0.1f, 0.1f)), textColor = Color.white },
-                                    hover = { textColor = Color.white },
-                                    fontSize = 12,
-                                    padding = new RectOffset(10, 10, 5, 5),
-                                    margin = new RectOffset(2, 2, 2, 2),
-                                };
-                                using (new BackgroundColorScope(DeleteRed)) {
-                                    if (GUILayout.Button("Delete Editor", deleteButtonStyle)) {
-                                        var message = editorType == EditorType.Symlink ? "Are you sure you want to delete this editor?" : "Are you sure you want to delete this editor? All files will be permanently lost!";
-                                        events.EditorDelete = EditorUtility.DisplayDialog(
-                                            "Delete this editor?",
-                                            message,
-                                            "Delete",
-                                            "Cancel") ? editorInfo.Path : events.EditorDelete;
-                                    }
+                                var previousScriptingDefineSymbols = sVisible.ScriptingDefineSymbols[i];
+                                sVisible.ScriptingDefineSymbols[i] = EditorGUILayout.TextField(sVisible.ScriptingDefineSymbols[i], EditorStyles.textField);
+                                if (previousScriptingDefineSymbols != sVisible.ScriptingDefineSymbols[i]) {
+                                    sVisible.IsDirty = true;
                                 }
 
-                                GUILayout.FlexibleSpace();
                                 GUILayout.EndHorizontal();
-                                EditorGUI.EndDisabledGroup();
                             }
+
+                            GUILayout.Space(10);
+
+                            GUILayout.BeginHorizontal();
+                            var deleteButtonStyle = new GUIStyle(GUI.skin.button)
+                            {
+                                normal = { background = CreateColorTexture(ref sColorTextureA, new Color(0.2f, 0.2f, 0.2f)), textColor = Color.white },
+                                active = { background = CreateColorTexture(ref sColorTextureB, new Color(0.1f, 0.1f, 0.1f)), textColor = Color.white },
+                                hover = { textColor = Color.white },
+                                fontSize = 12,
+                                padding = new RectOffset(10, 10, 5, 5),
+                                margin = new RectOffset(2, 2, 2, 2),
+                            };
+                            using (new BackgroundColorScope(DeleteRed)) {
+                                if (GUILayout.Button("Delete Editor", deleteButtonStyle)) {
+                                    var message = editorType == EditorType.Symlink ? "Are you sure you want to delete this editor?" : "Are you sure you want to delete this editor? All files will be permanently lost!";
+                                    events.EditorDelete = EditorUtility.DisplayDialog(
+                                        "Delete this editor?",
+                                        message,
+                                        "Delete",
+                                        "Cancel") ? editorInfo.Path : events.EditorDelete;
+                                }
+                            }
+
+                            GUILayout.FlexibleSpace();
+                            GUILayout.EndHorizontal();
+                            EditorGUI.EndDisabledGroup();
                         }
                         GUILayout.EndVertical();
                     }
@@ -307,12 +315,12 @@ public class CoordinatorWindow : EditorWindow
                 var testState = UntilExitSettings.Coordinator_TestState;
                 var hasAppearTestable = testState == EditorStates.AnEditorsOpen || testState == EditorStates.AllEditorsClosed;
                 using (new EditorGUILayout.VerticalScope("box")) {
-                    using (new EnableGroupScope(sVisible.NumberOfProcessRunning > 0 && !EditorUtility.scriptCompilationFailed))
+                    using (new EnableGroupScope(sVisible.NumberOfProcessRunning > 0 && !EditorUtility.scriptCompilationFailed && !EditorApplication.isPlaying))
                     using (new EditorGUILayout.VerticalScope())
                     using (new BackgroundColorScope(hasAppearTestable ? TestBlue : Color.red)) {
                         if (hasAppearTestable) {
                             var previous = sVisible.PlaymodeWillEnd;
-                            sVisible.PlaymodeWillEnd = GUILayout.Toggle(sVisible.PlaymodeWillEnd,   "PlaymodeWillEnd        | (Invoke Action PlaymodeWillEnd.Invoke() right before we exit playmode so that a user might verify the game's state, ex. 10 goals)", GUILayout.Width(900));
+                            sVisible.PlaymodeWillEnd = GUILayout.Toggle(sVisible.PlaymodeWillEnd, "PlaymodeWillEnd        | (Invoke Action PlaymodeWillEnd.Invoke() right before we exit playmode so that a user might verify the game's state, ex. 10 goals)", GUILayout.Width(900));
                             if (previous != sVisible.PlaymodeWillEnd) events.HasClickedToggle = true;
 
                             previous = sVisible.AfterPlaymodeEnded;
