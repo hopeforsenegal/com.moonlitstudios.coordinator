@@ -156,31 +156,47 @@ public class CoordinatorWindow : EditorWindow
         sLabelStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, normal = { textColor = CoolGray } };
     }
 
-    private static int RenderCoordinationMode()
+    private static bool IconButton(string iconPath, out Rect rect)
+    {
+        var isClicked = GUILayout.Button(EditorGUIUtility.IconContent(iconPath), GUIStyle.none);
+        rect = GUILayoutUtility.GetLastRect();
+        return isClicked;
+    }
+
+    private static int RenderCoordinationMode(ref Events events)
     {
         GUILayout.BeginHorizontal("box");
         GUILayout.FlexibleSpace();
 
         using (new EnableGroupScope(sVisible.NumberOfProcessRunning == 0)) {
-            GUILayout.BeginHorizontal("groupbox", GUILayout.Width(400));
+            GUILayout.BeginVertical("groupbox", GUILayout.Width(400));
+
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            events.Settings = IconButton("_Popup@2x", out var settingsRect);
+            events.Github = IconButton("_Help@2x", out var githubRect);
+            // Tool tips
+            if (settingsRect.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 200, 20), "Settings", EditorStyles.helpBox);
+            if (githubRect.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 200, 20), "Help/Documentation", EditorStyles.helpBox);
+            GUILayout.EndHorizontal();
+
             GUILayout.BeginHorizontal();
             GUILayout.Label("Coordination Mode:", EditorStyles.boldLabel);
             GUILayout.Space(20);
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
+
+
             GUILayout.BeginVertical();
             GUILayout.Space(20);
-
             var rectTop = RadioButton(0, ref sVisible.SelectedIndex, "No Coordination");
             var rectBottom = RadioButton(1, ref sVisible.SelectedIndex, "Coordinate Editors");
             // Tool tips
             if (rectTop.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y - 50, 400, 40), "Interact with your editors manually as if you created them and opened them yourself", EditorStyles.helpBox);
             if (rectBottom.Contains(Event.current.mousePosition)) GUI.Label(new Rect(Event.current.mousePosition.x + 20, Event.current.mousePosition.y + 10, 400, 40), "Your additional editors will go into playmode when the original main editor goes into playmode", EditorStyles.helpBox);
-
             GUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-            GUILayout.EndHorizontal();
+
+            GUILayout.EndVertical();
         }
 
         GUILayout.FlexibleSpace();
@@ -229,14 +245,8 @@ public class CoordinatorWindow : EditorWindow
             if (sVisible.Path != null && sVisible.Path.Length >= 1) {
                 GUILayout.BeginVertical();
                 {
-                    GUILayout.BeginHorizontal();
-                    GUILayout.FlexibleSpace();
-                    events.Settings = GUILayout.Button(EditorGUIUtility.IconContent("_Popup@2x"), GUIStyle.none);
-                    events.Github = GUILayout.Button(EditorGUIUtility.IconContent("_Help@2x"), GUIStyle.none);
-                    GUILayout.EndHorizontal();
-
                     var previousSelection = sVisible.SelectedIndex;
-                    var isToggled = RenderCoordinationMode();
+                    var isToggled = RenderCoordinationMode(ref events);
                     if (isToggled != previousSelection) events.UpdateCoordinatePlay = true;
                     GUILayout.Space(5);
                     EditorGUI.LabelField(EditorGUILayout.GetControlRect(GUILayout.Width(50)), "Status:", EditorStyles.boldLabel);
