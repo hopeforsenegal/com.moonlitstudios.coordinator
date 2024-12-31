@@ -9,7 +9,7 @@
 
 * **Standalone** interact with your [symlinked](https://en.wikipedia.org/wiki/Symbolic_link) or hard copy editors manually as if you created them and opened them yourself (This is what most people do to test their multiplayer games but now we've organized this process for you). Symlinked Editors have the benefit of reflecting script changes across the Main Editor and other symlinked projects.
 * **Playmode** your additional editors will go into playmode when the original main editor goes into playmode. Perfect for getting into a multiplayer game with fewer steps. 
-* **PlaymodeWillEnd and AfterPlaymodeEnded** is the solution to be even less hands on. The editors will go into playmode until the main editor calls ```Editors.TestComplete``` and then call a post test method for you (perfect for going through a set of tests and then uploading a build).
+* **PlaymodeWillEnd & AfterPlaymodeEnded** is the solution to be even less hands on. The editors will go into playmode until the main editor calls ```Editors.TestComplete``` and then call a post test method for you (perfect for going through a set of tests and then uploading a build).
 * **Scripting Defines** so you can have one Editor run as **Server** and the other as **Client** (or perhaps **Demo**).
 
 ## Installation
@@ -34,7 +34,7 @@ https://github.com/hopeforsenegal/com.moonlitstudios.coordinator/blob/38f6aa3adc
 https://github.com/hopeforsenegal/com.moonlitstudios.coordinator/blob/38f6aa3adc2beb64eb2c19e765a502b73efb6788/Test~/Test.cs#L35-L39
 
 ## How does it work?
-Additional Editors are created with [Symlinks](https://en.wikipedia.org/wiki/Symbolic_link) or Hard copies. We use files on disk that allow each editor to communicate with each other (easier then rolling a socket solution or more elaborate interprocess communication... also benefits from surviving Domain Reloads). That's 90% of how it works.
+Additional Editors are created with [Symlinks](https://en.wikipedia.org/wiki/Symbolic_link) or Hard copies. We use files on disk that allow each editor to communicate with each other (easier then rolling a socket solution or more elaborate interprocess communication... also benefits from surviving Domain Reloads). That's 90% of how it works. (_Feel free to gitignore these files on disk or extra projects that created if you use source control_)
 
 ## Need Help or want to chat?
 Feel free to just drop us a line on [Discord](https://discord.gg/8y87EEaftE). It's always better to have a real conversation and we can also screen share there. It's also not hard to reach us through our various other socials. There we can talk about the individual needs that you might have with your multiplayer projects.
