@@ -3,7 +3,7 @@
 
 **Coordinator** A dead easy way to coordinate multiple instances of Unity. Use **Coordinator** to boot up multiple Unity Editors in order iterate playmode sessions with your **multiplayer** game. You can choose to have stand alone Editors or Editors that go into playmode (with settings that help with testing and/or building your game). 
 
-<img width="1120" alt="Screenshot 2024-12-16 at 11 58 26 PM" src="https://github.com/user-attachments/assets/10c6a64a-9fb6-4946-a24c-082bbfd675e0" />
+<img width="1120" alt="Screenshot 2025-01-06 at 1 48 20 PM" src="https://github.com/user-attachments/assets/269de542-ec98-4145-b423-1cc34eb3cdcf" />
 
 ## Features
 
