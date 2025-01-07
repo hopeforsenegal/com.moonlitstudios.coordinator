@@ -225,7 +225,7 @@ public static class Editors
             UnityEngine.Debug.Log($"Writing command '{playmodeState}'");
             // Fake the mode we are switching to and send it to the additionals so they can go into playmode
             // at the same time instead of with a delay. if it gets killed because of a domain reload the queued version should still reach
-            // in general though it seems the editors arestill delayed with this method
+            // in general though it seems the editors are still delayed with this method
             var scriptingDefines = new string[CoordinatorWindow.MaximumAmountOfEditors];
             for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
                 scriptingDefines[i] = PlayerSettings.GetScriptingDefineSymbols(BuildTarget) + ";" + ProjectSettings.LoadInstance().scriptingDefineSymbols[i];

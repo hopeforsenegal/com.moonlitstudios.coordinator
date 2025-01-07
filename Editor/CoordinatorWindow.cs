@@ -175,7 +175,7 @@ public class CoordinatorWindow : EditorWindow
                     if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1) anEditorOpenMessage = $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open and ready for Playmode. (Switching modes not available until editors are close)";
                     if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1 && EditorApplication.isPlaying) anEditorOpenMessage = "All Editors are in Playmode";
                     if (UntilExitSettings.Coordinator_IsRunningAfterPlaymodeEnded) anEditorOpenMessage = "Running Post Test methods";
-                    var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => anEditorOpenMessage, };
+                    var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => anEditorOpenMessage};
                     if (EditorUtility.scriptCompilationFailed) statusMessage = "Compilation errors detected! Unable to go into Playmode or run Tests!";
                     EditorGUILayout.HelpBox(statusMessage, EditorUtility.scriptCompilationFailed ? MessageType.Error : MessageType.None, true);
 
