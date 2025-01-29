@@ -47,4 +47,12 @@ public static class SocketLayer
         Debug.Log($"{nameof(WriteMessage)} [{path}] '{message}'");
         File.WriteAllText(path, message);
     }
+
+    public static void DeleteMessage(string path)
+    {
+        Debug.Log($"{nameof(DeleteMessage)} [{path}]");
+        if (File.Exists(path)) {
+            File.Delete(path);
+        }
+    }
 }

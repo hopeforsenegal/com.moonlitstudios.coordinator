@@ -154,8 +154,11 @@ public static class Editors
             var path = SceneManager.GetActiveScene().path;
             if (!string.IsNullOrWhiteSpace(path)) {
                 UnityEngine.Debug.Assert(!string.IsNullOrWhiteSpace(SceneManager.GetActiveScene().name));
-                for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
-                    SocketLayer.WriteMessage($"{MessageEndpoint.Scene}{i}", path);
+
+                if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1) {
+                    for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
+                        SocketLayer.WriteMessage($"{MessageEndpoint.Scene}{i}", path);
+                    }
                 }
             }
             EditorApplication.playModeStateChanged += OriginalCoordinatePlaymodeStateChanged;

@@ -46,12 +46,13 @@ public class CoordinatorWindow : EditorWindow
         internal int NumAttributeMethods;
     }
 
+    public enum EventType { Open = 1, Close, }
     private struct Events
     {
-        public int Index;
         public EditorType EditorAdd;
-        public string EditorOpen;
-        public string EditorClose;
+        public EventType Editor;
+        public int[] Index;
+        public string[] Paths;
         public string EditorDelete;
         public string BrowseFolder;
         public bool UpdateCoordinatePlay;
@@ -175,7 +176,7 @@ public class CoordinatorWindow : EditorWindow
                     if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1) anEditorOpenMessage = $"{sVisible.NumberOfProcessRunning} Additional Editor(s) are Open and ready for Playmode. (Switching modes not available until editors are close)";
                     if (EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal == 1 && EditorApplication.isPlaying) anEditorOpenMessage = "All Editors are in Playmode";
                     if (UntilExitSettings.Coordinator_IsRunningAfterPlaymodeEnded) anEditorOpenMessage = "Running Post Test methods";
-                    var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => anEditorOpenMessage};
+                    var statusMessage = UntilExitSettings.Coordinator_TestState switch { EditorStates.AllEditorsClosed => "No Additional Editors are Open", EditorStates.AnEditorsOpen => anEditorOpenMessage };
                     if (EditorUtility.scriptCompilationFailed) statusMessage = "Compilation errors detected! Unable to go into Playmode or run Tests!";
                     EditorGUILayout.HelpBox(statusMessage, EditorUtility.scriptCompilationFailed ? MessageType.Error : MessageType.None, true);
 
@@ -211,7 +212,6 @@ public class CoordinatorWindow : EditorWindow
                         }
                         GUILayout.BeginVertical("GroupBox");
 
-                        events.Index = i;
                         using (new EditorGUILayout.HorizontalScope()) {
                             sVisible.IsShowFoldout[i] = EditorGUILayout.Foldout(sVisible.IsShowFoldout[i], string.Empty, true);
                             var status = $"[{editorType}]";
@@ -226,9 +226,17 @@ public class CoordinatorWindow : EditorWindow
                             if (i != 0) {
                                 using (new BackgroundColorScope(!isProcessRunningForProject ? OpenGreen : Color.red)) {
                                     if (!isProcessRunningForProject) {
-                                        events.EditorOpen = GUILayout.Button("Open Editor", GUILayout.Width(180), GUILayout.Height(30)) ? editorInfo.Path : events.EditorOpen;
+                                        if (GUILayout.Button("Open Editor", GUILayout.Width(180), GUILayout.Height(30))) {
+                                            events.Editor = EventType.Open;
+                                            events.Paths = new string[] { editorInfo.Path };
+                                            events.Index = new int[] { i };
+                                        }
                                     } else {
-                                        events.EditorClose = GUILayout.Button("Close Editor", GUILayout.Width(180), GUILayout.Height(30)) ? editorInfo.Path : events.EditorClose;
+                                        if (GUILayout.Button("Close Editor", GUILayout.Width(180), GUILayout.Height(30))) {
+                                            events.Editor = EventType.Close;
+                                            events.Paths = new string[] { editorInfo.Path };
+                                            events.Index = new int[] { i };
+                                        }
                                     }
                                 }
                             }
@@ -240,7 +248,10 @@ public class CoordinatorWindow : EditorWindow
                             EditorGUI.BeginDisabledGroup(true);
                             EditorGUILayout.TextField("Editor path", editorInfo.Path, EditorStyles.textField);
                             EditorGUI.EndDisabledGroup();
-                            events.BrowseFolder = GUILayout.Button(Browse, GUILayout.Width(170)) ? editorInfo.Path : events.BrowseFolder;
+                            if (GUILayout.Button(Browse, GUILayout.Width(170))) {
+                                events.BrowseFolder = editorInfo.Path;
+                                events.Index = new int[] { i };
+                            }
                             GUILayout.EndHorizontal();
 
                             EditorGUI.BeginDisabledGroup(isProcessRunningForProject);
@@ -274,11 +285,14 @@ public class CoordinatorWindow : EditorWindow
                             using (new BackgroundColorScope(DeleteRed)) {
                                 if (GUILayout.Button("Delete Editor", deleteButtonStyle)) {
                                     var message = editorType == EditorType.Symlink ? "Are you sure you want to delete this editor?" : "Are you sure you want to delete this editor? All files will be permanently lost!";
-                                    events.EditorDelete = EditorUtility.DisplayDialog(
+                                    if (EditorUtility.DisplayDialog(
                                         "Delete this editor?",
                                         message,
                                         "Delete",
-                                        "Cancel") ? editorInfo.Path : events.EditorDelete;
+                                        "Cancel")) {
+                                        events.EditorDelete = editorInfo.Path;
+                                        events.Index = new int[] { i };
+                                    }
                                 }
                             }
 
@@ -306,6 +320,30 @@ public class CoordinatorWindow : EditorWindow
                         GUILayout.EndVertical();
                     }
                     GUILayout.EndVertical();
+
+                    GUILayout.BeginHorizontal();
+                    if (sVisible.Path.Length > 1) {
+                        GUILayout.FlexibleSpace();
+                        EventType eventType = default;
+                        using (new BackgroundColorScope(OpenGreen)) {
+                            if (GUILayout.Button("Open All Editors")) eventType = EventType.Open;
+                        }
+                        using (new BackgroundColorScope(Color.red)) {
+                            if (GUILayout.Button("Close All Editors")) eventType = EventType.Close;
+                        }
+                        if (eventType == EventType.Open || eventType == EventType.Close) {
+                            events.Editor = eventType;
+                            var paths = new List<string>();
+                            var indices = new List<int>();
+                            for (int a = 1; a < sVisible.Path.Length; a++) {
+                                paths.Add(sVisible.Path[a]);
+                                indices.Add(a);
+                            }
+                            events.Paths = paths.ToArray();
+                            events.Index = indices.ToArray();
+                        }
+                    }
+                    GUILayout.EndHorizontal();
 
                     EditorGUILayout.EndScrollView();
                 }
@@ -357,6 +395,11 @@ public class CoordinatorWindow : EditorWindow
         if (events.UpdateCoordinatePlay) {
             sVisible.IsDirty = true;
             EditorUserSettings.Coordinator_CoordinatePlaySettingOnOriginal = sVisible.SelectedIndex;
+            // This might not actually fix the issue all the way (we could fix it potentially by switching to a dedicated file for the play setting)
+            for (var i = 0; i < CoordinatorWindow.MaximumAmountOfEditors; i++) {
+                SocketLayer.DeleteMessage($"{MessageEndpoint.Scene}{i}");
+                SocketLayer.DeleteMessage($"{MessageEndpoint.Playmode}{i}");
+            }
         }
         if (events.HasClickedToggle) {
             UntilExitSettings.Coordinator_PlaymodeWillEnd = sVisible.PlaymodeWillEnd;
@@ -380,34 +423,39 @@ public class CoordinatorWindow : EditorWindow
                 Editors.HardCopy(original.Packages, additional.Packages);
             }
         }
-        if (!string.IsNullOrWhiteSpace(events.EditorOpen)) {
+        if (events.Editor == EventType.Open) {
             sVisible.IsDirty = true;
-            UnityEngine.Debug.Assert(Directory.Exists(events.EditorOpen), "No Editor at location");
-#if UNITY_EDITOR_OSX
-            var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.BuildAdditionalEditorParams(events.Index.ToString())} {sVisible.CommandLineParams[events.Index]}");
-#else
-            var process = Process.Start($"{EditorApplication.applicationPath}", $"-projectPath \"{events.EditorOpen}\" {CommandLineParams.BuildAdditionalEditorParams(events.Index.ToString())} {sVisible.CommandLineParams[events.Index]}");
-#endif
             var processIds = new List<PathToProcessId>(sVisible.PathToProcessIds);
-            processIds.Add(new PathToProcessId { Path = events.EditorOpen, ProcessID = process.Id });
+            for (int i = 0; i < events.Paths.Length; i++) {
+                var path = events.Paths[i];
+                var index = events.Index[i];
+                UnityEngine.Debug.Assert(Directory.Exists(path), "No Editor at location");
+#if UNITY_EDITOR_OSX
+                var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{path}\" {CommandLineParams.BuildAdditionalEditorParams(index.ToString())} {sVisible.CommandLineParams[index]}");
+#else
+                var process = Process.Start($"{EditorApplication.applicationPath}", $"-projectPath \"{path}\" {CommandLineParams.BuildAdditionalEditorParams(index.ToString())} {sVisible.CommandLineParams[index]}");
+#endif
+                processIds.Add(new PathToProcessId { Path = path, ProcessID = process.Id });
+            }
             UntilExitSettings.Coordinator_ProjectPathToChildProcessID = PathToProcessId.Join(processIds.ToArray());
             UntilExitSettings.Coordinator_TestState = EditorStates.AnEditorsOpen;
             sVisible.PathToProcessIds = processIds.ToArray();
             SaveProjectSettings();
         }
-        if (!string.IsNullOrWhiteSpace(events.EditorClose)) {
+        if (events.Editor == EventType.Close) {
             sVisible.IsDirty = true;
             var pathToProcessIds = sVisible.PathToProcessIds;
             var hasKilled = false;
             foreach (var p in pathToProcessIds) {
-                if (p.Path == events.EditorClose) {
-                    try { Process.GetProcessById(p.ProcessID).Kill(); }// Is calling Kill() twice bad? Probably not so we don't need to update local memory
-                    catch (InvalidOperationException) { }
-                    hasKilled = true;
-                    break;
+                foreach (var pp in events.Paths) {
+                    if (p.Path == pp) {
+                        try { Process.GetProcessById(p.ProcessID).Kill(); } // Is calling Kill() twice bad? Probably not so we don't need to update local memory
+                        catch (InvalidOperationException) { }
+                        hasKilled = true;
+                        break;
+                    }
                 }
             }
-            if (sVisible.NumberOfProcessRunning == 0 && hasKilled) UnityEngine.Debug.LogWarning("Might want to investigate this!");
 
             UntilExitSettings.Coordinator_TestState = sVisible.NumberOfProcessRunning == 1 && hasKilled ? EditorStates.AllEditorsClosed : EditorStates.AnEditorsOpen;
         }
