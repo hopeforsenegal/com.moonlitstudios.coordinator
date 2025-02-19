@@ -430,12 +430,22 @@ public class CoordinatorWindow : EditorWindow
                 var path = events.Paths[i];
                 var index = events.Index[i];
                 UnityEngine.Debug.Assert(Directory.Exists(path), "No Editor at location");
+                var editorInfo = EditorPaths.PopulateEditorInfo(path);
+                var isProcessRunningForProject = false;
+                foreach (var p in sVisible.PathToProcessIds) {
+                    if (p.Path == editorInfo.Path) {
+                        isProcessRunningForProject = true;
+                        break;
+                    }
+                }
+                if (!isProcessRunningForProject) {
 #if UNITY_EDITOR_OSX
-                var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{path}\" {CommandLineParams.BuildAdditionalEditorParams(index.ToString())} {sVisible.CommandLineParams[index]}");
+                    var process = Process.Start($"{EditorApplication.applicationPath}/Contents/MacOS/Unity", $"-projectPath \"{path}\" {CommandLineParams.BuildAdditionalEditorParams(index.ToString())} {sVisible.CommandLineParams[index]}");
 #else
-                var process = Process.Start($"{EditorApplication.applicationPath}", $"-projectPath \"{path}\" {CommandLineParams.BuildAdditionalEditorParams(index.ToString())} {sVisible.CommandLineParams[index]}");
+                    var process = Process.Start($"{EditorApplication.applicationPath}", $"-projectPath \"{path}\" {CommandLineParams.BuildAdditionalEditorParams(index.ToString())} {sVisible.CommandLineParams[index]}");
 #endif
-                processIds.Add(new PathToProcessId { Path = path, ProcessID = process.Id });
+                    processIds.Add(new PathToProcessId { Path = path, ProcessID = process.Id });
+                }
             }
             UntilExitSettings.Coordinator_ProjectPathToChildProcessID = PathToProcessId.Join(processIds.ToArray());
             UntilExitSettings.Coordinator_TestState = EditorStates.AnEditorsOpen;
